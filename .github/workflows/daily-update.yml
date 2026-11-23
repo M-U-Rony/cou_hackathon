@@ -2,8 +2,9 @@ name: Daily TCB Data & Model Refresh
 
 on:
   schedule:
-    # Runs daily at 18:30 Bangladesh Time (12:30 UTC), after TCB publishes daily retail prices
+    # Runs daily at 18:30 and 22:30 Bangladesh Time (12:30 & 16:30 UTC) to catch late TCB uploads
     - cron: '30 12 * * *'
+    - cron: '30 16 * * *'
   workflow_dispatch:
 
 permissions:
