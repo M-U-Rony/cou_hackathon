@@ -9,23 +9,23 @@
   },
   "commodities": {
     "onion_local": {
-      "latest_date": "2026-11-22",
+      "latest_date": "2026-11-23",
       "latest_price": 50.0,
       "latest_status": "Normal",
-      "series_days": 1126,
+      "series_days": 1127,
       "model": {
-        "n_days": 1126,
+        "n_days": 1127,
         "coverage80": 0.786,
         "coverage95": 0.923,
         "median_width80_pct": 36.6,
-        "unusual_per100_normal_days": 6.63
+        "unusual_per100_normal_days": 6.62
       },
       "baseline": {
-        "n_days": 1126,
+        "n_days": 1127,
         "coverage80": 0.52,
-        "coverage95": 0.702,
+        "coverage95": 0.703,
         "median_width80_pct": 33.2,
-        "unusual_per100_normal_days": 29.32
+        "unusual_per100_normal_days": 29.29
       },
       "false_alarm_reduction_x": 4.42
     },
@@ -51,67 +51,67 @@
       "false_alarm_reduction_x": 2.95
     },
     "egg_farm": {
-      "latest_date": "2026-11-22",
+      "latest_date": "2026-11-23",
       "latest_price": 43.5,
       "latest_status": "Normal",
-      "series_days": 1126,
+      "series_days": 1127,
       "model": {
-        "n_days": 1126,
-        "coverage80": 0.821,
+        "n_days": 1127,
+        "coverage80": 0.822,
         "coverage95": 0.936,
         "median_width80_pct": 14.4,
-        "unusual_per100_normal_days": 6.48
+        "unusual_per100_normal_days": 6.47
       },
       "baseline": {
-        "n_days": 1126,
-        "coverage80": 0.526,
+        "n_days": 1127,
+        "coverage80": 0.525,
         "coverage95": 0.719,
         "median_width80_pct": 11.8,
-        "unusual_per100_normal_days": 25.81
+        "unusual_per100_normal_days": 25.89
       },
-      "false_alarm_reduction_x": 3.98
+      "false_alarm_reduction_x": 4.0
     },
     "potato": {
-      "latest_date": "2026-11-22",
+      "latest_date": "2026-11-23",
       "latest_price": 27.5,
       "latest_status": "Normal",
-      "series_days": 1126,
+      "series_days": 1127,
       "model": {
-        "n_days": 1126,
+        "n_days": 1127,
         "coverage80": 0.794,
         "coverage95": 0.925,
         "median_width80_pct": 34.6,
-        "unusual_per100_normal_days": 8.1
+        "unusual_per100_normal_days": 8.09
       },
       "baseline": {
-        "n_days": 1126,
+        "n_days": 1127,
         "coverage80": 0.526,
-        "coverage95": 0.742,
+        "coverage95": 0.743,
         "median_width80_pct": 23.6,
-        "unusual_per100_normal_days": 24.01
+        "unusual_per100_normal_days": 23.99
       },
-      "false_alarm_reduction_x": 2.96
+      "false_alarm_reduction_x": 2.97
     },
     "green_chili": {
-      "latest_date": "2026-11-22",
-      "latest_price": 90.0,
+      "latest_date": "2026-11-23",
+      "latest_price": 100.0,
       "latest_status": "Normal",
-      "series_days": 1108,
+      "series_days": 1109,
       "model": {
-        "n_days": 1108,
+        "n_days": 1109,
         "coverage80": 0.776,
         "coverage95": 0.936,
         "median_width80_pct": 101.5,
         "unusual_per100_normal_days": 4.98
       },
       "baseline": {
-        "n_days": 1108,
-        "coverage80": 0.669,
-        "coverage95": 0.819,
-        "median_width80_pct": 89.2,
-        "unusual_per100_normal_days": 16.57
+        "n_days": 1109,
+        "coverage80": 0.668,
+        "coverage95": 0.818,
+        "median_width80_pct": 88.9,
+        "unusual_per100_normal_days": 16.65
       },
-      "false_alarm_reduction_x": 3.33
+      "false_alarm_reduction_x": 3.34
     }
   },
   "events": [
@@ -249,7 +249,7 @@
       "target_fa": 10,
       "method": "model",
       "threshold": 0.86,
-      "actual_fa": 9.94,
+      "actual_fa": 9.93,
       "events": 7,
       "detected": 7,
       "median_lead": 16.0,
@@ -259,7 +259,7 @@
       "target_fa": 1,
       "method": "baseline",
       "threshold": 6.4,
-      "actual_fa": 0.99,
+      "actual_fa": 0.98,
       "events": 7,
       "detected": 3,
       "median_lead": 5.0,
@@ -288,8 +288,8 @@
     {
       "target_fa": 10,
       "method": "baseline",
-      "threshold": 1.96,
-      "actual_fa": 9.81,
+      "threshold": 1.94,
+      "actual_fa": 10.0,
       "events": 7,
       "detected": 7,
       "median_lead": 20.0,
