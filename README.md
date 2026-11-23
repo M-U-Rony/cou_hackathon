@@ -1,7 +1,7 @@
 # FairPrice BD (ন্যায্য দাম)
 
-[![CI](https://github.com/M-U-Rony/fairprice-bd/actions/workflows/ci.yml/badge.svg)](https://github.com/M-U-Rony/fairprice-bd/actions/workflows/ci.yml)
-[![Daily TCB Data & Model Refresh](https://github.com/M-U-Rony/fairprice-bd/actions/workflows/daily-update.yml/badge.svg)](https://github.com/M-U-Rony/fairprice-bd/actions/workflows/daily-update.yml)
+[![CI](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/ci.yml/badge.svg)](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/ci.yml)
+[![Daily TCB Data & Model Refresh](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/daily-update.yml/badge.svg)](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/daily-update.yml)
 
 **An Explainable Food-Price Anomaly Detection & Early Warning System for Bangladesh** — built for **CoU AI Hackathon (TechNova) 2026**.
 
@@ -31,8 +31,8 @@ flowchart LR
     end
 
     subgraph App["Production Web App (dashboard/)"]
-        UI["React 19 + TS + Custom SVG Charts\nindex.html (Monitor) & replay.html (Crisis Replay)"]
-        GUARD["Optional Guardrailed GenAI (api/)\nClaude + Number-Guard + ElevenLabs TTS"]
+        UI["React 19 + TS + Custom SVG Charts\nindex.html (Monitor), landing.html, login.html & replay.html"]
+        GUARD["Serverless API (api/)\nClaude + Number-Guard + ElevenLabs TTS\nOptional scrypt + HMAC-SHA256 Auth & Watchlist (api/auth.ts)"]
     end
 
     TCB --> FETCH --> CLEAN
@@ -102,13 +102,15 @@ When thresholds are calibrated so both methods emit the **exact same false-alarm
    - **Wholesale-to-Retail Spread:** AgriPriceBD daily Dhaka wholesale vs retail green chili ratio flagged when exceeding trailing 1-year 90th percentile.
 6. **Zero-Cost Automated Daily CI/CD (`.github/workflows/daily-update.yml`):**
    Runs daily at **18:30 BST (12:30 UTC)** via GitHub Actions: scrapes `tcb.gov.bd/pages/daily-rmps`, fetches Open-Meteo rainfall & Bangladesh Bank USD rate, retrains the walk-forward model if new data arrived, exports `dashboard/public/fairprice_data.json` & `reports/evaluation_summary.json`, and commits to `main` (triggering Vercel auto-deploy).
+7. **Optional Secure Accounts, Watchlist & Landing Page (`dashboard/api/auth.ts`, `login.html`, `landing.html`):**
+   The public market monitor (`index.html`) stays open without a login wall; optional email/password accounts use zero-dependency `node:crypto` `scrypt` with per-user random salts (`timingSafeEqual`), HMAC-SHA256 signed `HttpOnly; SameSite=Lax` cookies, per-IP rate limiting, saved district and commodity watchlist sync (`PATCH /api/auth`), and Vitest crypto/HTTP unit tests (`dashboard/api/_auth.test.ts`), alongside a live-data editorial `landing.html`.
 
 ---
 
 ## Repository Structure
 
 ```text
-fairprice-bd/
+cou_hackathon/
 ├── pipeline/                  # Data ingestion, Bengali Unicode cleaning, WFP & AgriPriceBD builders
 │   ├── fetch_daily.py         # Automated daily scraper (TCB + Open-Meteo + Bangladesh Bank)
 │   ├── clean_tcb.py           # Unicode normalization (য়→য়), Bengali numeral parsing, QC
@@ -123,10 +125,12 @@ fairprice-bd/
 │   └── build_eval_summary.py  # Exports compact committed reports/evaluation_summary.json
 ├── dashboard/                 # React 19 + TypeScript + Vite (zero charting/UI library bloat)
 │   ├── index.html             # Production Entrypoint 1: Main Market Monitor & LocalCheck
-│   ├── replay.html            # Production Entrypoint 2: Projector-ready Historical Crisis Replay
+│   ├── landing.html           # Production Entrypoint 2: Editorial Overview & Live TCB Snapshot
+│   ├── login.html             # Production Entrypoint 3: Optional Email/Password Login & Signup
+│   ├── replay.html            # Production Entrypoint 4: Projector-ready Historical Crisis Replay
 │   ├── prototypes.html        # Archived early UI explorations (monitor.html, today.html)
-│   ├── api/                   # Vercel Serverless Functions (Number-Guard summary, TTS, health)
-│   └── src/                   # Custom SVG charts (src/lib/charts.tsx), Vitest suites
+│   ├── api/                   # Vercel Serverless Functions (scrypt + HMAC-SHA256 auth, Number-Guard summary, TTS, health)
+│   └── src/                   # Custom SVG charts (src/lib/charts.tsx), Vitest suites (82 tests)
 ├── reports/
 │   └── evaluation_summary.json # Committed machine-readable walk-forward evaluation metrics
 ├── tests/                     # Fast Python pytest suite (synthetic fixtures, runs in seconds)
@@ -161,7 +165,7 @@ cd dashboard
 npm install
 npm test                          # Vitest + Testing Library
 npx tsc -p tsconfig.app.json --noEmit
-npm run build                     # Production bundle (index.html + replay.html)
+npm run build                     # Production bundle (index.html, landing.html, login.html, replay.html)
 npm run dev                       # Local dev server (http://localhost:5173)
 ```
 
