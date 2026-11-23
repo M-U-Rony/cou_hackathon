@@ -14,6 +14,7 @@ import {
   ttsConfigured,
 } from './_shared.js'
 
+const mp3Cache = new Map<string, Buffer>()
 const wavCache = new Map<string, Buffer>()
 
 export async function POST(req: Request) {
@@ -28,22 +29,41 @@ export async function POST(req: Request) {
   else text = (await findDay(body.commodity, body.date, req.url))?.day.text_bn?.replace(/\*\*/g, '')
   if (!text) return json({ error: 'এই দিনের তথ্য পাওয়া যায়নি' }, 404)
 
+  const cacheKey = `${body.commodity}|${body.date ?? 'latest'}|${body.variant ?? 'template'}`
   const elevenKey = env('ELEVENLABS_API_KEY'), voice = env('ELEVENLABS_VOICE_ID')
+  const openRouterKey = env('OPENROUTER_API_KEY')
+
   if (elevenKey && voice) {
-    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(12_000),
-      headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
-      body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_flash_v2_5' }),
-    })
-    if (!r.ok) return json({ error: `voice error ${r.status}` }, 502)
-    return new Response(r.body, { headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' } })
+    const cachedMp3 = mp3Cache.get(cacheKey)
+    if (cachedMp3) {
+      return new Response(new Uint8Array(cachedMp3), {
+        headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' },
+      })
+    }
+    try {
+      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(20_000),
+        headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
+        body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_v3' }),
+      })
+      if (r.ok) {
+        const mp3 = Buffer.from(await r.arrayBuffer())
+        if (mp3.length > 0) {
+          mp3Cache.set(cacheKey, mp3)
+          return new Response(new Uint8Array(mp3), {
+            headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' },
+          })
+        }
+      }
+      if (!openRouterKey) return json({ error: `voice error ${r.status}` }, 502)
+    } catch {
+      if (!openRouterKey) return json({ error: 'voice error' }, 502)
+    }
   }
 
-  const openRouterKey = env('OPENROUTER_API_KEY')
   if (!openRouterKey) return json({ error: 'server voice not configured' }, 501)
 
-  const cacheKey = `${body.commodity}|${body.date ?? 'latest'}|${body.variant ?? 'template'}`
   const cached = wavCache.get(cacheKey)
   if (cached) {
     return new Response(new Uint8Array(cached), {

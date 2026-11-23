@@ -6,7 +6,7 @@
 //   ANTHROPIC_API_KEY   fallback direct Anthropic Claude API key
 //   LLM_MODEL           optional, default google/gemini-2.5-flash (OpenRouter) or claude-haiku-4-5
 //   ELEVENLABS_API_KEY  + ELEVENLABS_VOICE_ID enable server voice
-//   ELEVENLABS_MODEL    optional, default eleven_flash_v2_5 (fast Bengali support)
+//   ELEVENLABS_MODEL    optional, default eleven_v3 (supports Bengali)
 //
 // The functions never take free text from the browser: they take a product
 // id and a date, look the facts up in the app's own data file, and only then
