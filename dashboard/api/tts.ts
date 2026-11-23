@@ -19,8 +19,9 @@ export async function POST(req: Request) {
 
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}`, {
     method: 'POST',
+    signal: AbortSignal.timeout(12_000),
     headers: { 'xi-api-key': key, 'content-type': 'application/json', accept: 'audio/mpeg' },
-    body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_v3' }),
+    body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_flash_v2_5' }),
   })
   if (!r.ok) return json({ error: `voice error ${r.status}` }, 502)
   return new Response(r.body, { headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' } })

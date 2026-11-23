@@ -2,10 +2,11 @@
 //
 // Keys live in environment variables only (Vercel project settings, or
 // dashboard/.env.local for local dev). The browser never sees them.
-//   ANTHROPIC_API_KEY   enables the AI Bangla summary
-//   LLM_MODEL           optional, default claude-haiku-5-5
+//   OPENROUTER_API_KEY  recommended primary key (multi-model fallback)
+//   ANTHROPIC_API_KEY   fallback direct Anthropic Claude API key
+//   LLM_MODEL           optional, default google/gemini-2.5-flash (OpenRouter) or claude-haiku-4-5
 //   ELEVENLABS_API_KEY  + ELEVENLABS_VOICE_ID enable server voice
-//   ELEVENLABS_MODEL    optional, default eleven_v3 (supports Bengali)
+//   ELEVENLABS_MODEL    optional, default eleven_flash_v2_5 (fast Bengali support)
 //
 // The functions never take free text from the browser: they take a product
 // id and a date, look the facts up in the app's own data file, and only then
@@ -28,7 +29,9 @@ const dataFile = (): Data =>
   (D ??= JSON.parse(readFileSync(join(process.cwd(), 'public', 'fairprice_data.json'), 'utf8')) as Data)
 
 export const env = (k: string) => (typeof process !== 'undefined' ? process.env[k] : undefined)
-export const llmModel = () => env('LLM_MODEL') || 'claude-haiku-5-5'
+export const llmConfigured = () => Boolean(env('OPENROUTER_API_KEY') || env('ANTHROPIC_API_KEY'))
+export const llmModel = () =>
+  env('LLM_MODEL') || (env('OPENROUTER_API_KEY') ? 'google/gemini-2.5-flash' : 'claude-haiku-4-5')
 
 export function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -102,21 +105,61 @@ const SYSTEM = `তুমি একটা বাজারদর অ্যাপ�
 - কেনা বা না কেনার পরামর্শ দেবে না।
 - ২–৩টা ছোট বাক্য, সহজ চলিত ভাষা, কোনো শিরোনাম, তালিকা বা ইমোজি নয়।`
 
-/** Call the Anthropic Messages API. Returns null when no key is set. */
-export async function llmSummary(facts: string): Promise<string | null> {
+const OPENROUTER_FALLBACKS = [
+  'google/gemini-2.5-flash',
+  'anthropic/claude-haiku-4.5',
+  'openai/gpt-4o-mini',
+]
+
+/** Call OpenRouter (primary, multi-model fallback) or Anthropic Messages API. Returns null when no key is set. */
+export async function llmSummary(facts: string): Promise<{ text: string; model: string } | null> {
+  const prompt = `তথ্য:\n${facts}\n\nএই তথ্য দিয়ে সারাংশ লেখো।`
+  const openRouterKey = env('OPENROUTER_API_KEY')
+  if (openRouterKey) {
+    const primary = llmModel()
+    const models = [...new Set([primary, ...OPENROUTER_FALLBACKS])]
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      signal: AbortSignal.timeout(12_000),
+      headers: {
+        Authorization: `Bearer ${openRouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://fairprice-bd.vercel.app',
+        'X-Title': 'FairPrice BD',
+      },
+      body: JSON.stringify({
+        model: primary,
+        models,
+        temperature: 0.2,
+        max_tokens: 400,
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    })
+    if (!r.ok) throw new Error(`OpenRouter error ${r.status}: ${(await r.text()).slice(0, 200)}`)
+    const j = await r.json() as { model?: string; choices?: { message?: { content?: string } }[] }
+    const text = j.choices?.[0]?.message?.content?.trim() || ''
+    return text ? { text, model: j.model || primary } : null
+  }
+
   const key = env('ANTHROPIC_API_KEY')
   if (!key) return null
+  const model = llmModel()
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(12_000),
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model: llmModel(), max_tokens: 400, system: SYSTEM,
-      messages: [{ role: 'user', content: `তথ্য:\n${facts}\n\nএই তথ্য দিয়ে সারাংশ লেখো।` }],
+      model, max_tokens: 400, system: SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
     }),
   })
   if (!r.ok) throw new Error(`LLM error ${r.status}: ${(await r.text()).slice(0, 200)}`)
   const j = await r.json() as { content?: { type: string; text?: string }[] }
-  return (j.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim() || null
+  const text = (j.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim()
+  return text ? { text, model } : null
 }
 
 /** Per-instance cache so the same day is not summarised (or spoken) twice. */
@@ -132,18 +175,18 @@ export async function summaryFor(commodity: string, date?: string) {
   const facts = factSheet(f)
   let out: { text: string; ai: boolean; model?: string; note?: string }
   try {
-    const text = await llmSummary(facts)
-    if (!text) out = { text: template, ai: false, note: 'no_key' }
+    const res = await llmSummary(facts)
+    if (!res) out = { text: template, ai: false, note: 'no_key' }
     else {
       const allowed = allowedNumbers(f, facts)
-      const bad = numbersIn(text).filter((n) => !allowed.has(n) && !allowed.has(Math.round(n)))
+      const bad = numbersIn(res.text).filter((n) => !allowed.has(n) && !allowed.has(Math.round(n)))
       out = bad.length
         ? { text: template, ai: false, note: `number_check_failed: ${bad.slice(0, 3).join(', ')}` }
-        : { text, ai: true, model: llmModel() }
+        : { text: res.text, ai: true, model: res.model }
     }
   } catch (e) {
     out = { text: template, ai: false, note: String((e as Error).message).slice(0, 160) }
   }
-  cache.set(id, out)
+  if (out.ai) cache.set(id, out)
   return { ...out, date: f.day.date }
 }
