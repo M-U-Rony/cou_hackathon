@@ -1,0 +1,80 @@
+/* Login & account page for FairPrice BD: shares the slate-green market-board theme. */
+:root {
+  --board: #1d3a31;
+  --board-ink: #f2efe4;
+  --board-dim: #b5c2b6;
+  --bg: #eef1ee;
+  --surface: #ffffff;
+  --ink: #17212a;
+  --muted: #5b676c;
+  --rule: #d3dad6;
+  --accent: #1d3a31;
+  --accent-ink: #ffffff;
+  --c-ok: #2e7d4f;
+  --c-watch: #b7791f;
+  --c-alarm: #b42318;
+  --font: 'Anek Bangla', 'Noto Sans Bengali', 'Hind Siliguri', system-ui, sans-serif;
+  --wordmark: 'Galada', 'Anek Bangla', cursive;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --board: #183028; --bg: #11181b; --surface: #182125; --ink: #e3eae6; --muted: #93a19e; --rule: #29363a;
+    --accent: #9ed9b0; --accent-ink: #11181b;
+    --c-ok: #5cbf87; --c-watch: #e3a93b; --c-alarm: #f06a5e;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15.5px; line-height: 1.55; }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--c-watch); outline-offset: 2px; }
+
+.band { background: var(--board); color: var(--board-ink); padding: 12px clamp(16px, 3vw, 28px);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+.wordmark { font-family: var(--wordmark); font-size: 34px; line-height: 1.1; font-weight: 400; margin: 0 auto 0 0; text-decoration: none; }
+.nav-link { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid rgba(242, 239, 228, 0.35); text-decoration: none; font-size: 14px; }
+.nav-link:hover { background: rgba(242, 239, 228, 0.1); }
+
+.auth-wrap { max-width: 460px; margin: clamp(24px, 6vh, 64px) auto; padding: 0 16px 48px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 26px 24px; display: grid; gap: 16px; }
+.card h1 { margin: 0; font-size: 26px; line-height: 1.2; }
+.sub { margin: -8px 0 0; color: var(--muted); font-size: 14.5px; }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; background: var(--bg); border-radius: 8px; border: 1px solid var(--rule); }
+.tabs button { border: 0; background: transparent; border-radius: 6px; padding: 8px 10px; cursor: pointer; font-weight: 600; color: var(--muted); }
+.tabs button[aria-selected='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+
+.field { display: grid; gap: 5px; }
+.field label { font-size: 14px; font-weight: 600; }
+.field input, .field select {
+  width: 100%; height: 42px; padding: 0 12px; border-radius: 7px;
+  border: 1px solid var(--rule); background: var(--bg); color: var(--ink);
+}
+.field input:focus, .field select:focus { border-color: var(--accent); outline: none; }
+.hint { font-size: 12.5px; color: var(--muted); }
+
+.btn-primary {
+  height: 44px; border: 0; border-radius: 7px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 16px; cursor: pointer;
+}
+.btn-primary:disabled { opacity: 0.6; cursor: wait; }
+.btn-ghost {
+  height: 40px; border: 1px solid var(--rule); border-radius: 7px; background: transparent;
+  font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.btn-ghost:hover { border-color: var(--ink); }
+
+.alert { padding: 10px 12px; border-radius: 7px; font-size: 14px; border: 1px solid color-mix(in srgb, var(--c-alarm) 40%, transparent);
+  background: color-mix(in srgb, var(--c-alarm) 10%, transparent); color: var(--c-alarm); }
+.ok-box { padding: 12px 14px; border-radius: 7px; font-size: 14.5px; border: 1px solid color-mix(in srgb, var(--c-ok) 40%, transparent);
+  background: color-mix(in srgb, var(--c-ok) 10%, transparent); color: var(--c-ok); display: grid; gap: 8px; }
+
+.note { font-size: 13.5px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 12px; margin: 0; }
+.demo-box { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-radius: 7px; background: var(--bg); border: 1px dashed var(--rule); font-size: 13.5px; }
+.demo-box code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }

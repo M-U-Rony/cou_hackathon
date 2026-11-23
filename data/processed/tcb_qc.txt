@@ -1,0 +1,9 @@
+raw rows: 101069  price rows (all items, deduped): 72466
+distinct dates: 1431  range: 2021-05-17 .. 2026-11-15
+distinct item names: 80
+
+egg_farm      n= 1395 2021-05-17..2026-11-15 names=['ডিম (ফার্ম)'] units=['প্রতি হালি'] mid[min/med/max]=29/44/62 maxgap=115d gaps>7d=14 jumps>50%=0
+green_chili   n=  245 2026-02-18..2026-11-15 names=['কাঁচামরিচ'] units=['প্রতি কেজি'] mid[min/med/max]=60/120/360 maxgap=8d gaps>7d=2 jumps>50%=1
+onion_import  n=  877 2021-05-17..2026-02-10 names=['পিঁয়াজ (আমদানি)'] units=['প্রতি কেজি'] mid[min/med/max]=28/70/165 maxgap=115d gaps>7d=15 jumps>50%=0
+onion_local   n= 1395 2021-05-17..2026-11-15 names=['পিঁয়াজ (দেশী', 'পিঁয়াজ (দেশী)', 'পিঁয়াজ (দেশী)(নতুন/পুরাতন)', 'পিঁয়াজ (নতুন) (দেশী)', 'পিঁয়াজ (নতুন/পুরাতন) (দেশী)'] units=['প্রতি কেজি'] mid[min/med/max]=25/60/185 maxgap=115d gaps>7d=14 jumps>50%=0
+potato        n= 1395 2021-05-17..2026-11-15 names=['আলু', 'আলু (নতুন, মানভেদে)', 'আলু (নতুন/পুরাতন)', 'আলু (নতুন/পুরাতন)(মানভেদে)', 'আলু (মানভেদে)'] units=['প্রতি কেজি'] mid[min/med/max]=15/28/80 maxgap=115d gaps>7d=14 jumps>50%=0

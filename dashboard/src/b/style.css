@@ -1,0 +1,76 @@
+/* Prototype B: the market price board (দর তালিকা) that shops hang up.
+   Single theme by choice: slate-green board, chalk text, a thin wooden frame.
+   Galada (hand-lettered) only for the title and item names; Baloo Da 2 for
+   numbers and reading. Layout: one phone-width column, one row per item. */
+:root {
+  --board: #1d3a31;
+  --board-2: #234539;
+  --frame: #6e4a2b;
+  --chalk: #f2efe4;
+  --chalk-dim: #b5c2b6;
+  --line-c: rgba(242, 239, 228, 0.16);
+  --c-ok: #9ed9b0;
+  --c-watch: #f5d565;
+  --c-alarm: #ff8f7e;
+  --c-down: #9cc7ee;
+  --c-band80: rgba(242, 239, 228, 0.22);
+  --c-band95: rgba(242, 239, 228, 0.09);
+  --c-line: #f2efe4;
+  --c-grid: rgba(242, 239, 228, 0.12);
+  --c-axis: #b5c2b6;
+  --c-mark: #f5d565;
+  --c-text: #f2efe4;
+  --display: 'Galada', 'Baloo Da 2', cursive;
+  --body: 'Baloo Da 2', 'Noto Sans Bengali', system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: #2b2219; color: var(--chalk); font-family: var(--body); font-size: 16px; line-height: 1.5; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px dashed var(--c-watch); outline-offset: 3px; }
+
+.board { max-width: 480px; margin: 0 auto; min-height: 100%; background: var(--board);
+  background-image: radial-gradient(ellipse at 30% 0%, rgba(255,255,255,0.05), transparent 60%);
+  border-left: 8px solid var(--frame); border-right: 8px solid var(--frame); padding: 22px 16px 40px; }
+@media (max-width: 420px) { .board { border-width: 0; } }
+
+h1 { font-family: var(--display); font-weight: 400; font-size: 46px; line-height: 1.05; margin: 0; text-align: left; }
+.date { color: var(--chalk-dim); margin: 2px 0 14px; font-size: 15px; }
+.intro { margin: 0 0 18px; font-size: 15px; color: var(--chalk-dim); max-width: 40ch; }
+
+.rows { display: grid; }
+.row { border-top: 1px dashed var(--line-c); }
+.row:last-child { border-bottom: 1px dashed var(--line-c); }
+.row > button { width: 100%; background: none; border: 0; text-align: left; padding: 14px 2px 12px; cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
+.name { font-family: var(--display); font-size: 27px; line-height: 1.2; }
+.price { font-weight: 700; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; justify-self: end; }
+.price small { font-size: 14px; font-weight: 500; color: var(--chalk-dim); }
+.exp { font-size: 14px; color: var(--chalk-dim); }
+.verdict { justify-self: end; font-weight: 600; font-size: 15px; color: var(--tone); display: inline-flex; align-items: center; gap: 6px; }
+.verdict::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--tone);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 25%, transparent); }
+.bar { grid-column: 1 / -1; margin-top: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--chalk-dim); }
+.more { grid-column: 1 / -1; font-size: 13.5px; color: var(--c-watch); margin-top: 2px; }
+
+.detail { padding: 2px 2px 18px; display: grid; gap: 12px; }
+.detail p { margin: 0; font-size: 15.5px; max-width: 46ch; }
+.detail p strong { color: var(--tone); }
+.why { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.why li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; font-size: 15px; }
+.why .arrow { font-weight: 700; }
+.why .up { color: var(--c-alarm); }
+.why .dn { color: var(--c-ok); }
+.why .amt { font-variant-numeric: tabular-nums; }
+.why li.resid { border-top: 1px dashed var(--line-c); padding-top: 6px; color: var(--tone); }
+.h3 { font-weight: 600; font-size: 15px; color: var(--chalk-dim); margin: 4px 0 -4px; }
+
+.stale-row { opacity: 0.6; }
+.legend { margin-top: 22px; display: grid; gap: 6px; font-size: 14px; color: var(--chalk-dim); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.note { margin-top: 18px; font-size: 13px; color: var(--chalk-dim); max-width: 44ch; }
+.loading { padding: 40px; color: var(--chalk-dim); }
+@media (prefers-reduced-motion: no-preference) { .detail { animation: open 0.18s ease-out; } }
+@keyframes open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

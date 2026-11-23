@@ -1,0 +1,9 @@
+pandas>=2.2
+numpy>=1.26
+matplotlib>=3.8
+lightgbm>=4.3
+shap>=0.45
+scikit-learn>=1.4
+requests>=2.31
+beautifulsoup4>=4.12
+openpyxl>=3.1

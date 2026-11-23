@@ -1,0 +1,63 @@
+name: Daily TCB Data & Model Refresh
+
+on:
+  schedule:
+    # Runs daily at 18:30 Bangladesh Time (12:30 UTC), after TCB publishes daily retail prices
+    - cron: '30 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Fetch latest TCB, rainfall, and BDT/USD data
+        run: python pipeline/fetch_daily.py
+
+      - name: Check for new data
+        id: changes
+        run: |
+          if git diff --quiet data/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retrain walk-forward quantile + CQR model
+        if: steps.changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          python modeling/train_quantile.py
+          python modeling/fair_compare.py
+          python modeling/export_dashboard.py
+          cp reports/dashboard/fairprice_data.json dashboard/public/fairprice_data.json
+          python modeling/build_eval_summary.py
+
+      - name: Commit and push updated data (triggers Vercel auto-deploy)
+        if: steps.changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "fairprice-bd-bot"
+          git config user.email "bot@fairprice-bd.local"
+          git add data/processed/tcb_core.csv data/external/rain_daily.csv data/external/bdt_usd.csv dashboard/public/fairprice_data.json reports/evaluation_summary.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: daily TCB data & model refresh ($(date -u +%Y-%m-%d))"
+            git pull --rebase origin main
+            git push
+          fi

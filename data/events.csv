@@ -1,0 +1,8 @@
+event_id,commodity,start,peak,end,description,source_note
+onion_india_ban_2023,onion_local,2023-12-01,2023-12-09,2023-12-31,India onion export ban (announced 2023-12-08); Dhaka retail onion jumped within days,News + TCB peak 185 Tk/kg on 2023-12-09
+egg_oct_2024,egg_farm,2024-09-25,2024-10-15,2024-10-31,Farm egg price spike in October 2024,"TCB peak 61.5 Tk/hali on 2024-10-15; news: Tk175-180/dozen on 2024-10-08 (Dhaka Tribune), ~Tk200 mid-Oct (Prothom Alo), fell after import duty cut 2024-10-17 (Dhaka Tribune 2024-10-18) - verified"
+potato_late_2024,potato,2024-10-15,2024-11-23,2024-12-15,Potato price rise in late 2024,"TCB peak 80 Tk/kg on 2024-11-23; news: Tk65-70 Nov 2024 called record (Financial Express 2024-11-25), Tk70-80 (PotatoPro) - verified"
+onion_nov_2025,onion_local,2025-10-15,2025-11-10,2025-11-30,Onion spike Nov 2025 (about 42 to 105-115 Tk/kg),News + TCB 115 Tk/kg on 2025-11-10
+egg_spring_2026,egg_farm,2026-04-10,2026-05-15,2026-05-31,Egg rise Apr-May 2026 (120 to 150-155 Tk/dozen),News + TCB 45 Tk/hali on 2026-05-15
+chili_jul_2026,green_chili,2026-07-12,2026-07-29,2026-08-16,Green chili spike to about 360 Tk/kg,TCB peak 360 Tk/kg on 2026-07-29; too little history to train (data starts 2026-02)
+egg_autumn_2026,egg_farm,2026-09-15,2026-10-11,2026-10-31,Egg record Sep-Oct 2026 (about 160-165 Tk/dozen in news),News + TCB 48.5 Tk/hali on 2026-10-11
