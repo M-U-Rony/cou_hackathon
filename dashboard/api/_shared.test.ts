@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { allowedNumbers, llmConfigured, llmModel, llmSummary, numbersIn } from './_shared.js'
+import {
+  allowedNumbers,
+  extractSseAudioChunks,
+  llmConfigured,
+  llmModel,
+  llmSummary,
+  numbersIn,
+  pcm16ToWav,
+  ttsConfigured,
+} from './_shared.js'
 
 const origEnv = { ...process.env }
 const origFetch = globalThis.fetch
 
 afterEach(() => {
-  for (const k of ['OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'LLM_MODEL']) {
+  for (const k of ['OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'LLM_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID']) {
     if (origEnv[k] === undefined) delete process.env[k]
     else process.env[k] = origEnv[k]
   }
@@ -96,5 +105,51 @@ describe('Number-Guard verification', () => {
     expect(numbersIn('আজ দাম ৪৩.৫ টাকা, সীমা ৪২ থেকে ৪৭ টাকা।').every((n) => allowed.has(n))).toBe(true)
     const bad = numbersIn('গত সপ্তাহে দাম ৯৯ টাকা বা 120 টাকা ছিল।').filter((n) => !allowed.has(n))
     expect(bad).toEqual([99, 120])
+  })
+})
+
+describe('TTS configuration & WAV/SSE helpers', () => {
+  it('enables ttsConfigured via OpenRouter key or ElevenLabs credentials', () => {
+    delete process.env.OPENROUTER_API_KEY
+    delete process.env.ELEVENLABS_API_KEY
+    delete process.env.ELEVENLABS_VOICE_ID
+    expect(ttsConfigured()).toBe(false)
+
+    process.env.OPENROUTER_API_KEY = 'sk-or-test'
+    expect(ttsConfigured()).toBe(true)
+
+    delete process.env.OPENROUTER_API_KEY
+    process.env.ELEVENLABS_API_KEY = 'el-key'
+    expect(ttsConfigured()).toBe(false)
+    process.env.ELEVENLABS_VOICE_ID = 'el-voice'
+    expect(ttsConfigured()).toBe(true)
+  })
+
+  it('wraps PCM16 bytes in a valid 44-byte RIFF/WAVE header', () => {
+    const pcm = Buffer.from([1, 2, 3, 4, 5, 6])
+    const wav = pcm16ToWav(pcm, 24_000)
+    expect(wav.length).toBe(44 + pcm.length)
+    expect(wav.toString('ascii', 0, 4)).toBe('RIFF')
+    expect(wav.readUInt32LE(4)).toBe(36 + pcm.length)
+    expect(wav.toString('ascii', 8, 12)).toBe('WAVE')
+    expect(wav.toString('ascii', 12, 16)).toBe('fmt ')
+    expect(wav.readUInt32LE(24)).toBe(24_000)
+    expect(wav.toString('ascii', 36, 40)).toBe('data')
+    expect(wav.readUInt32LE(40)).toBe(pcm.length)
+    expect(wav.subarray(44).equals(pcm)).toBe(true)
+  })
+
+  it('extracts and concatenates base64 audio chunks from SSE frames', () => {
+    const c1 = Buffer.from('hello').toString('base64')
+    const c2 = Buffer.from('world').toString('base64')
+    const sse = [
+      ': OPENROUTER PROCESSING',
+      `data: ${JSON.stringify({ choices: [{ delta: { audio: { data: c1, transcript: 'a' } } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: 'ignore' } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: { audio: { data: c2 } } }] })}`,
+      'data: [DONE]',
+    ].join('\n')
+    const out = extractSseAudioChunks(sse)
+    expect(out.toString('utf8')).toBe('helloworld')
   })
 })

@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   try { body = (await req.json()) as typeof body } catch { return json({ error: 'bad json' }, 400) }
   if (!body.commodity || !/^[a-z_]{3,30}$/.test(body.commodity)) return json({ error: 'commodity missing' }, 400)
   if (body.date && !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) return json({ error: 'bad date' }, 400)
-  const s = await summaryFor(body.commodity, body.date)
+  const s = await summaryFor(body.commodity, body.date, req.url)
   if (!s) return json({ error: 'এই দিনের তথ্য পাওয়া যায়নি' }, 404)
   return json(s)
 }

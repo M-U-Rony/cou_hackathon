@@ -11,8 +11,9 @@
 // The functions never take free text from the browser: they take a product
 // id and a date, look the facts up in the app's own data file, and only then
 // call the LLM. So a deployed key cannot be used as an open proxy.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 type Step = { key: string; label: string; value: number; kind: string }
 type Day = {
@@ -23,13 +24,36 @@ type Data = {
   commodities: Record<string, { name_bn: string; unit_bn: string; latest: Day }>
   events: { commodity: string; days: Day[] }[]
 }
-// vercel.json ships public/fairprice_data.json with the functions (includeFiles)
+
 let D: Data | null = null
-const dataFile = (): Data =>
-  (D ??= JSON.parse(readFileSync(join(process.cwd(), 'public', 'fairprice_data.json'), 'utf8')) as Data)
+async function loadDataFile(reqUrl?: string): Promise<Data> {
+  if (D) return D
+  const candidates = [
+    join(process.cwd(), 'public', 'fairprice_data.json'),
+    join(process.cwd(), 'dashboard', 'public', 'fairprice_data.json'),
+    join(process.cwd(), 'dist', 'fairprice_data.json'),
+    fileURLToPath(new URL('../public/fairprice_data.json', import.meta.url)),
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      D = JSON.parse(readFileSync(p, 'utf8')) as Data
+      return D
+    }
+  }
+  let origin = 'https://fairprice-bd.vercel.app'
+  if (reqUrl) {
+    try { origin = new URL(reqUrl).origin } catch { /* fallback to production origin */ }
+  }
+  const r = await fetch(`${origin}/fairprice_data.json`, { signal: AbortSignal.timeout(10_000) })
+  if (!r.ok) throw new Error(`Failed to fetch fairprice_data.json: HTTP ${r.status}`)
+  D = (await r.json()) as Data
+  return D
+}
 
 export const env = (k: string) => (typeof process !== 'undefined' ? process.env[k] : undefined)
 export const llmConfigured = () => Boolean(env('OPENROUTER_API_KEY') || env('ANTHROPIC_API_KEY'))
+export const ttsConfigured = () =>
+  Boolean((env('ELEVENLABS_API_KEY') && env('ELEVENLABS_VOICE_ID')) || env('OPENROUTER_API_KEY'))
 export const llmModel = () =>
   env('LLM_MODEL') || (env('OPENROUTER_API_KEY') ? 'google/gemini-2.5-flash' : 'claude-haiku-4-5')
 
@@ -50,11 +74,16 @@ export function limited(req: Request, perMinute = 20) {
   return recent.length > perMinute
 }
 
-export function findDay(commodity: string, date?: string): { day: Day; name: string; unit: string } | null {
-  const c = dataFile().commodities[commodity]
+export async function findDay(
+  commodity: string,
+  date?: string,
+  reqUrl?: string,
+): Promise<{ day: Day; name: string; unit: string } | null> {
+  const data = await loadDataFile(reqUrl)
+  const c = data.commodities[commodity]
   if (!c) return null
   if (!date || date === c.latest.date) return { day: c.latest, name: c.name_bn, unit: c.unit_bn }
-  for (const e of dataFile().events) {
+  for (const e of data.events) {
     if (e.commodity !== commodity) continue
     const d = e.days.find((x) => x.date === date)
     if (d?.text_bn) return { day: d, name: c.name_bn, unit: c.unit_bn }
@@ -165,8 +194,8 @@ export async function llmSummary(facts: string): Promise<{ text: string; model: 
 /** Per-instance cache so the same day is not summarised (or spoken) twice. */
 const cache = new Map<string, { text: string; ai: boolean; model?: string; note?: string }>()
 
-export async function summaryFor(commodity: string, date?: string) {
-  const f = findDay(commodity, date)
+export async function summaryFor(commodity: string, date?: string, reqUrl?: string) {
+  const f = await findDay(commodity, date, reqUrl)
   if (!f) return null
   const id = `${commodity}|${f.day.date}`
   const hit = cache.get(id)
@@ -189,4 +218,44 @@ export async function summaryFor(commodity: string, date?: string) {
   }
   if (out.ai) cache.set(id, out)
   return { ...out, date: f.day.date }
+}
+
+/** Wrap raw 16-bit mono PCM bytes into a playable RIFF/WAVE container. */
+export function pcm16ToWav(pcm: Buffer, sampleRate = 24_000): Buffer {
+  const header = Buffer.alloc(44)
+  header.write('RIFF', 0, 'ascii')
+  header.writeUInt32LE(36 + pcm.length, 4)
+  header.write('WAVE', 8, 'ascii')
+  header.write('fmt ', 12, 'ascii')
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(1, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(sampleRate * 2, 28)
+  header.writeUInt16LE(2, 32)
+  header.writeUInt16LE(16, 34)
+  header.write('data', 36, 'ascii')
+  header.writeUInt32LE(pcm.length, 40)
+  return Buffer.concat([header, pcm])
+}
+
+/** Extract and decode base64 PCM audio chunks from OpenRouter SSE stream text. */
+export function extractSseAudioChunks(sseText: string): Buffer {
+  const chunks: Buffer[] = []
+  for (const rawLine of sseText.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line.startsWith('data:')) continue
+    const payload = line.slice(5).trim()
+    if (!payload || payload === '[DONE]') continue
+    try {
+      const parsed = JSON.parse(payload) as {
+        choices?: { delta?: { audio?: { data?: string } }; message?: { audio?: { data?: string } } }[]
+      }
+      const b64 = parsed.choices?.[0]?.delta?.audio?.data ?? parsed.choices?.[0]?.message?.audio?.data
+      if (typeof b64 === 'string' && b64) chunks.push(Buffer.from(b64, 'base64'))
+    } catch {
+      /* ignore non-JSON SSE lines */
+    }
+  }
+  return Buffer.concat(chunks)
 }
