@@ -31,35 +31,91 @@ export async function aiSummary(commodity: string, date?: string): Promise<AiSum
   return j as AiSummary
 }
 
+export function ttsUrl(commodity: string, date: string | undefined, variant: 'template' | 'ai'): string {
+  const p = new URLSearchParams({ commodity, variant })
+  if (date) p.set('date', date)
+  return `./api/tts?${p}`
+}
+
+const prefetched = new Set<string>()
+/** Warm the Edge CDN and browser HTTP cache before the user clicks "শুনুন". */
+export function prefetchAudio(opts: {
+  commodity: string; date?: string; variant: 'template' | 'ai'; server: boolean
+}): void {
+  if (!opts.server) return
+  const url = ttsUrl(opts.commodity, opts.date, opts.variant)
+  if (prefetched.has(url)) return
+  prefetched.add(url)
+  fetch(url, { priority: 'low' } as RequestInit).catch(() => { prefetched.delete(url) })
+}
+
 let current: HTMLAudioElement | null = null
+let cancelActive: (() => void) | null = null
 
 export function stopSpeaking() {
-  current?.pause()
-  current = null
+  cancelActive?.()
+  cancelActive = null
+  if (current) {
+    current.onplaying = null
+    current.onended = null
+    current.onerror = null
+    current.pause()
+    current.src = ''
+    current = null
+  }
   try { speechSynthesis.cancel() } catch { /* no speech engine */ }
 }
 
-/** Speak a day's text. Server voice when configured, else the browser's Bangla voice.
- *  Resolves 'played' | 'no-voice' | 'error'. onEnd fires when speech finishes. */
+/** Speak a day's text. Streams server audio progressively when configured,
+ *  falling back to the browser's Bangla voice. */
 export async function speak(opts: {
-  text: string; commodity: string; date?: string; variant: 'template' | 'ai'; server: boolean; onEnd: () => void
+  text: string; commodity: string; date?: string; variant: 'template' | 'ai'; server: boolean
+  onPlay?: () => void; onEnd: () => void
 }): Promise<'played' | 'no-voice' | 'error'> {
   stopSpeaking()
+  let aborted = false
   if (opts.server) {
-    try {
-      const r = await fetch('./api/tts', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ commodity: opts.commodity, date: opts.date, variant: opts.variant }),
-      })
-      if (r.ok) {
-        const url = URL.createObjectURL(await r.blob())
-        current = new Audio(url)
-        current.onended = () => { URL.revokeObjectURL(url); opts.onEnd() }
-        await current.play()
-        return 'played'
+    const ok = await new Promise<boolean>((resolve) => {
+      const audio = new Audio(ttsUrl(opts.commodity, opts.date, opts.variant))
+      audio.preload = 'auto'
+      current = audio
+      let settled = false
+      let started = false
+      const finish = (val: boolean) => {
+        if (!settled) { settled = true; resolve(val) }
       }
-    } catch { /* fall through to the browser voice */ }
+      cancelActive = () => { aborted = true; finish(false) }
+
+      audio.onplaying = () => {
+        started = true
+        opts.onPlay?.()
+        finish(true)
+      }
+      audio.onended = () => {
+        if (current === audio) { current = null; cancelActive = null }
+        finish(true)
+        opts.onEnd()
+      }
+      audio.onerror = () => {
+        if (current === audio) { current = null; cancelActive = null }
+        if (started) opts.onEnd()
+        finish(false)
+      }
+      audio.play().then(() => {
+        if (!started && !aborted && !audio.paused) {
+          started = true
+          opts.onPlay?.()
+          finish(true)
+        }
+      }).catch(() => {
+        if (current === audio) { current = null; cancelActive = null }
+        finish(false)
+      })
+    })
+    if (aborted) return 'played'
+    if (ok) return 'played'
   }
+  if (aborted) return 'played'
   try {
     const synth = window.speechSynthesis
     if (!synth) return 'no-voice'
@@ -74,6 +130,7 @@ export async function speak(opts: {
     u.voice = voice
     u.lang = voice.lang
     u.rate = 0.95
+    u.onstart = () => opts.onPlay?.()
     u.onend = opts.onEnd
     u.onerror = opts.onEnd
     synth.speak(u)

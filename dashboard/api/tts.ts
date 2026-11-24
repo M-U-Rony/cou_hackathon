@@ -1,8 +1,7 @@
-// POST /api/tts  {commodity, date?, variant: "template" | "ai"}  -> audio/mpeg or audio/wav
-// Speaks only text this app produced (the template paragraph or the checked
-// AI summary for that day), via ElevenLabs (when configured) or OpenRouter
-// (`openai/gpt-audio-mini` streaming PCM16 wrapped as WAV). Without keys: 501,
-// and the browser falls back to its own speech engine.
+// GET /api/tts?commodity=egg_farm&date=2026-11-23&variant=template|ai
+// POST /api/tts  {commodity, date?, variant: "template" | "ai"}
+// -> audio/mpeg (progressive ElevenLabs stream) or audio/wav (OpenRouter fallback)
+// GET responses carry Vercel Edge CDN cache headers so repeat plays start <0.2s.
 import {
   bnTextForSpeech,
   env,
@@ -16,67 +15,67 @@ import {
 } from './_shared.js'
 
 const DEFAULT_FREE_VOICE = 'EXAVITQu4vr4xnSDxMaL'
-const mp3Cache = new Map<string, Buffer>()
+const EDGE_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=3600'
+
+const blockedVoices = new Set<string>()
 const wavCache = new Map<string, Buffer>()
 
-export async function POST(req: Request) {
+async function handleTts(
+  req: Request,
+  params: { commodity?: string; date?: string; variant?: string },
+  cacheable: boolean,
+): Promise<Response> {
   if (!ttsConfigured()) return json({ error: 'server voice not configured' }, 501)
-  if (limited(req, 10)) return json({ error: 'অনেক বেশি অনুরোধ' }, 429)
-  let body: { commodity?: string; date?: string; variant?: string }
-  try { body = (await req.json()) as typeof body } catch { return json({ error: 'bad json' }, 400) }
-  if (!body.commodity || !/^[a-z_]{3,30}$/.test(body.commodity)) return json({ error: 'commodity missing' }, 400)
+  if (limited(req, 30)) return json({ error: 'অনেক বেশি অনুরোধ' }, 429)
+  if (!params.commodity || !/^[a-z_]{3,30}$/.test(params.commodity)) return json({ error: 'commodity missing' }, 400)
+  if (params.date && !/^\d{4}-\d{2}-\d{2}$/.test(params.date)) return json({ error: 'bad date' }, 400)
 
+  const variant = params.variant === 'ai' ? 'ai' : 'template'
   let text: string | undefined
-  if (body.variant === 'ai') text = (await summaryFor(body.commodity, body.date, req.url))?.text
-  else text = (await findDay(body.commodity, body.date, req.url))?.day.text_bn?.replace(/\*\*/g, '')
+  if (variant === 'ai') text = (await summaryFor(params.commodity, params.date, req.url))?.text
+  else text = (await findDay(params.commodity, params.date, req.url))?.day.text_bn?.replace(/\*\*/g, '')
   if (!text) return json({ error: 'এই দিনের তথ্য পাওয়া যায়নি' }, 404)
   const spokenText = bnTextForSpeech(text)
 
-  const cacheKey = `${body.commodity}|${body.date ?? 'latest'}|${body.variant ?? 'template'}`
+  const cacheControl = cacheable ? EDGE_CACHE_CONTROL : 'no-store'
+  const cacheKey = `${params.commodity}|${params.date ?? 'latest'}|${variant}`
   const elevenKey = env('ELEVENLABS_API_KEY')?.trim()
   const voice = env('ELEVENLABS_VOICE_ID')?.trim()
   const openRouterKey = env('OPENROUTER_API_KEY')?.trim()
   let elevenErr = ''
 
   if (elevenKey && voice) {
-    const cachedMp3 = mp3Cache.get(cacheKey)
-    if (cachedMp3) {
-      return new Response(new Uint8Array(cachedMp3), {
-        headers: {
-          'content-type': 'audio/mpeg',
-          'cache-control': 'no-store',
-          'x-tts-provider': 'elevenlabs-cache',
-        },
-      })
-    }
-    const voicesToTry = voice === DEFAULT_FREE_VOICE ? [voice] : [voice, DEFAULT_FREE_VOICE]
+    const candidates = (voice === DEFAULT_FREE_VOICE ? [voice] : [voice, DEFAULT_FREE_VOICE])
+      .filter((v) => !blockedVoices.has(v))
+    const voicesToTry = candidates.length ? candidates : [DEFAULT_FREE_VOICE]
+
     try {
       for (const v of voicesToTry) {
-        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(v)}`, {
-          method: 'POST',
-          signal: AbortSignal.timeout(20_000),
-          headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
-          body: JSON.stringify({
-            text: spokenText.slice(0, 2000),
-            model_id: env('ELEVENLABS_MODEL') || 'eleven_v3',
-            language_code: 'bn',
-          }),
-        })
-        if (r.ok) {
-          const mp3 = Buffer.from(await r.arrayBuffer())
-          if (mp3.length > 0) {
-            mp3Cache.set(cacheKey, mp3)
-            return new Response(new Uint8Array(mp3), {
-              headers: {
-                'content-type': 'audio/mpeg',
-                'cache-control': 'no-store',
-                'x-tts-provider': v === voice ? 'elevenlabs' : 'elevenlabs-premade',
-              },
-            })
-          }
+        const r = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(v)}/stream?output_format=mp3_44100_64`,
+          {
+            method: 'POST',
+            signal: AbortSignal.timeout(20_000),
+            headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
+            body: JSON.stringify({
+              text: spokenText.slice(0, 2000),
+              model_id: env('ELEVENLABS_MODEL') || 'eleven_v3',
+              language_code: 'bn',
+            }),
+          },
+        )
+        if (r.ok && r.body) {
+          return new Response(r.body, {
+            headers: {
+              'content-type': 'audio/mpeg',
+              'cache-control': cacheControl,
+              'x-tts-provider': v === voice ? 'elevenlabs-stream' : 'elevenlabs-premade-stream',
+            },
+          })
         }
         const errText = (await r.text()).slice(0, 300)
         console.error('[tts] elevenlabs failed', { voice: v, status: r.status, body: errText })
+        if (r.status === 402 || r.status === 404) blockedVoices.add(v)
         elevenErr = String(r.status)
         if (r.status === 401) break
       }
@@ -92,7 +91,7 @@ export async function POST(req: Request) {
 
   const wavHeaders: Record<string, string> = {
     'content-type': 'audio/wav',
-    'cache-control': 'no-store',
+    'cache-control': cacheControl,
     'x-tts-provider': 'openrouter',
   }
   if (elevenErr) wavHeaders['x-tts-fallback-reason'] = `elevenlabs_${elevenErr}`
@@ -134,4 +133,23 @@ export async function POST(req: Request) {
   const wav = pcm16ToWav(pcm, 24_000)
   wavCache.set(cacheKey, wav)
   return new Response(new Uint8Array(wav), { headers: wavHeaders })
+}
+
+export async function GET(req: Request) {
+  const sp = new URL(req.url).searchParams
+  return handleTts(
+    req,
+    {
+      commodity: sp.get('commodity') ?? undefined,
+      date: sp.get('date') ?? undefined,
+      variant: sp.get('variant') ?? undefined,
+    },
+    true,
+  )
+}
+
+export async function POST(req: Request) {
+  let body: { commodity?: string; date?: string; variant?: string }
+  try { body = (await req.json()) as typeof body } catch { return json({ error: 'bad json' }, 400) }
+  return handleTts(req, body, false)
 }

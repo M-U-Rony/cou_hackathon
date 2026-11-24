@@ -1,7 +1,7 @@
 // FairPrice BD app: monitor depth (prototype A) + plain words (prototype B).
 // Desktop: product rail + detail. Phone (<900px): board list, tap -> detail.
 // URL hash = selected product (#onion-local), so a detail view can be shared.
-import { StrictMode, useEffect, useMemo, useState } from 'react'
+import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BandChart, MultiLine, OverlayLegendItem, OverlayNote, RangeBar, Waterfall } from '../lib/charts'
 import type { Commodity, Day, FairRow, FPData, MarketData, SpreadData, Tone } from '../lib/data'
@@ -13,7 +13,7 @@ import { checkAvailable, localRange } from '../lib/localcheck'
 import { MarketPicker } from './MarketPicker'
 import { LocalCheck } from './LocalCheck'
 import type { AiSummary, Health } from '../lib/ai'
-import { aiHealth, aiSummary, speak, stopSpeaking } from '../lib/ai'
+import { aiHealth, aiSummary, prefetchAudio, speak, stopSpeaking } from '../lib/ai'
 import { fetchSession, logoutSession, saveUserPreferences, type AuthUser } from '../lib/auth'
 import './style.css'
 
@@ -114,11 +114,16 @@ function SummaryBlock({ d, k, health }: { d: Day; k: string; health: Health }) {
   const [ai, setAi] = useState<AiSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-  const [speaking, setSpeaking] = useState<'' | 'template' | 'ai'>('')
-  useEffect(() => { setCopied(false); setAi(null); setMsg(''); stopSpeaking(); setSpeaking('') }, [k, d.date])
-  useEffect(() => () => stopSpeaking(), [])
+  const [audioState, setAudioState] = useState<'idle' | 'loading' | 'playing'>('idle')
+  const playRun = useRef(0)
+  useEffect(() => {
+    playRun.current += 1
+    setCopied(false); setAi(null); setMsg(''); stopSpeaking(); setAudioState('idle')
+  }, [k, d.date])
+  useEffect(() => () => { playRun.current += 1; stopSpeaking() }, [])
 
   const shown = ai?.ai ? ai.text : plain(d.text_bn)
+  const variant: 'template' | 'ai' = ai?.ai ? 'ai' : 'template'
   const copy = async () => {
     try { await navigator.clipboard.writeText(`${shown}\nন্যায্য দাম, উৎস: TCB`); setCopied(true) } catch { setCopied(false) }
   }
@@ -134,12 +139,22 @@ function SummaryBlock({ d, k, health }: { d: Day; k: string; health: Health }) {
     setBusy(false)
   }
   const listen = async () => {
-    if (speaking) { stopSpeaking(); setSpeaking(''); return }
-    const variant = ai?.ai ? 'ai' : 'template'
-    setSpeaking(variant); setMsg('')
-    const r = await speak({ text: shown, commodity: k, date: d.date, variant, server: health.tts, onEnd: () => setSpeaking('') })
+    if (audioState !== 'idle') {
+      playRun.current += 1
+      stopSpeaking()
+      setAudioState('idle')
+      return
+    }
+    const run = ++playRun.current
+    setAudioState('loading'); setMsg('')
+    const r = await speak({
+      text: shown, commodity: k, date: d.date, variant, server: health.tts,
+      onPlay: () => { if (run === playRun.current) setAudioState('playing') },
+      onEnd: () => { if (run === playRun.current) setAudioState('idle') },
+    })
+    if (run !== playRun.current) return
     if (r !== 'played') {
-      setSpeaking('')
+      setAudioState('idle')
       setMsg(r === 'no-voice'
         ? 'এই ব্রাউজারে বাংলা ভয়েস নেই। Android-এ Chrome, বা সার্ভারে ভয়েস key দিলে শোনা যাবে।'
         : 'শোনানো গেল না, আবার চেষ্টা করুন।')
@@ -154,7 +169,15 @@ function SummaryBlock({ d, k, health }: { d: Day; k: string; health: Health }) {
         : <p className="para"><Bold text={d.text_bn ?? ''} /></p>}
       <div className="actions">
         <button className="copy" onClick={copy}>{copied ? 'কপি হয়েছে' : 'সারাংশ কপি করুন'}</button>
-        <button className="ghost" onClick={listen} aria-pressed={!!speaking}>{speaking ? 'থামান' : 'শুনুন'}</button>
+        <button
+          className="ghost"
+          onClick={listen}
+          onMouseEnter={() => prefetchAudio({ commodity: k, date: d.date, variant, server: health.tts })}
+          onFocus={() => prefetchAudio({ commodity: k, date: d.date, variant, server: health.tts })}
+          aria-pressed={audioState !== 'idle'}
+        >
+          {audioState === 'playing' ? 'থামান' : audioState === 'loading' ? 'চালু হচ্ছে…' : 'শুনুন'}
+        </button>
         {health.llm && !ai?.ai && (
           <button className="ghost" onClick={askAi} disabled={busy}>{busy ? 'লেখা হচ্ছে…' : 'AI দিয়ে আরও সহজ করে'}</button>
         )}
