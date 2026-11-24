@@ -259,3 +259,77 @@ export function extractSseAudioChunks(sseText: string): Buffer {
   }
   return Buffer.concat(chunks)
 }
+
+const BN_WORDS = [
+  'শূন্য', 'এক', 'দুই', 'তিন', 'চার', 'পাঁচ', 'ছয়', 'সাত', 'আট', 'নয়',
+  'দশ', 'এগারো', 'বারো', 'তেরো', 'চৌদ্দ', 'পনেরো', 'ষোলো', 'সতেরো', 'আঠারো', 'উনিশ',
+  'বিশ', 'একুশ', 'বাইশ', 'তেইশ', 'চব্বিশ', 'পঁচিশ', 'ছাব্বিশ', 'সাতাশ', 'আঠাশ', 'উনত্রিশ',
+  'ত্রিশ', 'একত্রিশ', 'বত্রিশ', 'তেত্রিশ', 'চৌত্রিশ', 'পঁয়ত্রিশ', 'ছত্রিশ', 'সাঁইত্রিশ', 'আটত্রিশ', 'উনচল্লিশ',
+  'চল্লিশ', 'একচল্লিশ', 'বিয়াল্লিশ', 'তেতাল্লিশ', 'চুয়াল্লিশ', 'পঁয়তাল্লিশ', 'ছেচল্লিশ', 'সাতচল্লিশ', 'আটচল্লিশ', 'উনপঞ্চাশ',
+  'পঞ্চাশ', 'একান্ন', 'বাহান্ন', 'তিপ্পান্ন', 'চুয়ান্ন', 'পঞ্চান্ন', 'ছাপ্পান্ন', 'সাতান্ন', 'আটান্ন', 'উনষাট',
+  'ষাট', 'একষট্টি', 'বাষট্টি', 'তেষট্টি', 'চৌষট্টি', 'পঁয়ষট্টি', 'ছেষট্টি', 'সাতষট্টি', 'আটষট্টি', 'উনসত্তর',
+  'সত্তর', 'একাত্তর', 'বাহাত্তর', 'তিয়াত্তর', 'চুয়াত্তর', 'পঁচাত্তর', 'ছিয়াত্তর', 'সাতাত্তর', 'আটাত্তর', 'উনআশি',
+  'আশি', 'একাশি', 'বিরাশি', 'তিরাশি', 'চুরাশি', 'পঁচাশি', 'ছিয়াশি', 'সাতাশি', 'আটাশি', 'উননব্বই',
+  'নব্বই', 'একানব্বই', 'বিরানব্বই', 'তিরানব্বই', 'চুরানব্বই', 'পঁচানব্বই', 'ছিয়ানব্বই', 'সাতানব্বই', 'আটানব্বই', 'নিরানব্বই',
+] as const
+
+/** Convert an integer to standard spoken Bengali words (0..99, hundreds, thousands, lakhs). */
+export function bnNumberToWords(n: number): string {
+  if (!Number.isFinite(n)) return ''
+  if (n < 0) return `মাইনাস ${bnNumberToWords(-n)}`
+  let x = Math.trunc(n)
+  if (x < 100) return BN_WORDS[x]
+  const parts: string[] = []
+  if (x >= 100_000) {
+    parts.push(`${bnNumberToWords(Math.floor(x / 100_000))} লাখ`)
+    x %= 100_000
+  }
+  if (x >= 1_000) {
+    parts.push(`${bnNumberToWords(Math.floor(x / 1_000))} হাজার`)
+    x %= 1_000
+  }
+  if (x >= 100) {
+    parts.push(`${BN_WORDS[Math.floor(x / 100)]} শত`)
+    x %= 100
+  }
+  if (x > 0) parts.push(BN_WORDS[x])
+  return parts.join(' ')
+}
+
+function numStrToBn(raw: string): string {
+  const [intPart, decPart] = raw.split('.')
+  const intWords = bnNumberToWords(Number(intPart || '0'))
+  if (!decPart) return intWords
+  const decWords = decPart.split('').map((d) => BN_WORDS[Number(d)] ?? d).join(' ')
+  return `${intWords} দশমিক ${decWords}`
+}
+
+function ordinalToBn(d: number, suf: string): string {
+  if (d === 1 && suf === 'লা') return 'পহেলা'
+  if (d === 2 && suf === 'রা') return 'দোসরা'
+  if (d === 3 && suf === 'রা') return 'তেসরা'
+  if (d === 4 && suf === 'ঠা') return 'চৌঠা'
+  const w = bnNumberToWords(d)
+  if (suf === 'শে' && w.endsWith('শ')) return `${w}ে`
+  return `${w}${suf}`
+}
+
+/** Spell out all Bengali/ASCII numbers, ranges, decimals, units, and acronyms for natural TTS. */
+export function bnTextForSpeech(text: string): string {
+  let out = text
+    .replace(/\*\*/g, '')
+    .replace(/\bTCB\b/g, 'টিসিবি')
+    .replace(/\bWFP\b/g, 'ডব্লিউএফপি')
+    .replace(/\s*(?:৳|টাকা)\s*\/\s*(হালি|কেজি|লিটার|ডজন|পিস)/g, ' টাকা প্রতি $1')
+    .replace(/\s*৳/g, ' টাকা')
+  out = toAscii(out).replace(/(\d),(\d)/g, '$1$2')
+  out = out
+    .replace(/(\d+(?:\.\d+)?)\s*[–—-]\s*(\d+(?:\.\d+)?)/g, (_, a: string, b: string) => `${numStrToBn(a)} থেকে ${numStrToBn(b)}`)
+    .replace(/(\d+(?:\.\d+)?)\s*%/g, (_, n: string) => `${numStrToBn(n)} শতাংশ`)
+    .replace(/((?:^|[\s(]))([+−-])(\d+(?:\.\d+)?)/g, (_, pre: string, sign: string, n: string) => `${pre}${sign === '+' ? 'প্লাস' : 'মাইনাস'} ${numStrToBn(n)}`)
+    .replace(/(\d+)(শে|ই|লা|রা|ঠা)/g, (_, d: string, suf: string) => ordinalToBn(Number(d), suf))
+    .replace(/\d+(?:\.\d+)?/g, (m) => numStrToBn(m))
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+  return out
+}

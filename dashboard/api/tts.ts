@@ -4,6 +4,7 @@
 // (`openai/gpt-audio-mini` streaming PCM16 wrapped as WAV). Without keys: 501,
 // and the browser falls back to its own speech engine.
 import {
+  bnTextForSpeech,
   env,
   extractSseAudioChunks,
   findDay,
@@ -29,6 +30,7 @@ export async function POST(req: Request) {
   if (body.variant === 'ai') text = (await summaryFor(body.commodity, body.date, req.url))?.text
   else text = (await findDay(body.commodity, body.date, req.url))?.day.text_bn?.replace(/\*\*/g, '')
   if (!text) return json({ error: 'এই দিনের তথ্য পাওয়া যায়নি' }, 404)
+  const spokenText = bnTextForSpeech(text)
 
   const cacheKey = `${body.commodity}|${body.date ?? 'latest'}|${body.variant ?? 'template'}`
   const elevenKey = env('ELEVENLABS_API_KEY')?.trim()
@@ -54,7 +56,11 @@ export async function POST(req: Request) {
           method: 'POST',
           signal: AbortSignal.timeout(20_000),
           headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
-          body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_v3' }),
+          body: JSON.stringify({
+            text: spokenText.slice(0, 2000),
+            model_id: env('ELEVENLABS_MODEL') || 'eleven_v3',
+            language_code: 'bn',
+          }),
         })
         if (r.ok) {
           const mp3 = Buffer.from(await r.arrayBuffer())
@@ -115,7 +121,7 @@ export async function POST(req: Request) {
           role: 'system',
           content: 'তুমি একজন বাংলা সংবাদ পাঠক। ব্যবহারকারীর দেওয়া বাংলা লেখাটি হুবহু, স্পষ্ট ও স্বাভাবিক বাংলাদেশি উচ্চারণে পড়ে শোনাও। কোনো বাড়তি কথা বা ভূমিকা যোগ করবে না।',
         },
-        { role: 'user', content: text.slice(0, 1200) },
+        { role: 'user', content: spokenText.slice(0, 1200) },
       ],
     }),
   })

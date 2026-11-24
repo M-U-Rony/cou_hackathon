@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   allowedNumbers,
+  bnNumberToWords,
+  bnTextForSpeech,
   extractSseAudioChunks,
   llmConfigured,
   llmModel,
@@ -151,5 +153,39 @@ describe('TTS configuration & WAV/SSE helpers', () => {
     ].join('\n')
     const out = extractSseAudioChunks(sse)
     expect(out.toString('utf8')).toBe('helloworld')
+  })
+})
+
+describe('Bengali number-to-words speech normalization', () => {
+  it('converts integers across 0..2026 into standard Bengali words', () => {
+    expect(bnNumberToWords(0)).toBe('শূন্য')
+    expect(bnNumberToWords(14)).toBe('চৌদ্দ')
+    expect(bnNumberToWords(23)).toBe('তেইশ')
+    expect(bnNumberToWords(43)).toBe('তেতাল্লিশ')
+    expect(bnNumberToWords(58)).toBe('আটান্ন')
+    expect(bnNumberToWords(100)).toBe('এক শত')
+    expect(bnNumberToWords(147)).toBe('এক শত সাতচল্লিশ')
+    expect(bnNumberToWords(2026)).toBe('দুই হাজার ছাব্বিশ')
+  })
+
+  it('spells out numbers, decimals, ranges, percentages, currency, and ordinals in real templates', () => {
+    const raw = '২৩ নভেম্বর ২০২৬: ঢাকায় ফার্মের ডিমের TCB দাম ৪৩.৫ টাকা/হালি। ১৪ দিন আগের তথ্য দিয়ে প্রত্যাশিত দাম ছিল ৪২–৪৭ টাকা। অবস্থা: **ঠিক আছে**। প্রায় ৩% কমেছে।'
+    const spoken = bnTextForSpeech(raw)
+    expect(spoken).toContain('তেইশ নভেম্বর দুই হাজার ছাব্বিশ')
+    expect(spoken).toContain('টিসিবি')
+    expect(spoken).toContain('তেতাল্লিশ দশমিক পাঁচ টাকা প্রতি হালি')
+    expect(spoken).toContain('চৌদ্দ দিন')
+    expect(spoken).toContain('বিয়াল্লিশ থেকে সাতচল্লিশ টাকা')
+    expect(spoken).toContain('তিন শতাংশ')
+    expect(spoken).not.toContain('**')
+    expect(spoken).not.toMatch(/[0-9০-৯]/)
+
+    const aiText = 'আজ ২৩শে নভেম্বর, ২০২৬ (গত মাসের ১৫ই তারিখ থেকে) দামের তারতম্য (-১.৫ টাকা) এবং (+০.৯ টাকা)।'
+    const aiSpoken = bnTextForSpeech(aiText)
+    expect(aiSpoken).toContain('তেইশে নভেম্বর, দুই হাজার ছাব্বিশ')
+    expect(aiSpoken).toContain('পনেরোই তারিখ')
+    expect(aiSpoken).toContain('(মাইনাস এক দশমিক পাঁচ টাকা)')
+    expect(aiSpoken).toContain('(প্লাস শূন্য দশমিক নয় টাকা)')
+    expect(aiSpoken).not.toMatch(/[0-9০-৯]/)
   })
 })
