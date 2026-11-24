@@ -14,6 +14,7 @@ import {
   ttsConfigured,
 } from './_shared.js'
 
+const DEFAULT_FREE_VOICE = 'EXAVITQu4vr4xnSDxMaL'
 const mp3Cache = new Map<string, Buffer>()
 const wavCache = new Map<string, Buffer>()
 
@@ -30,45 +31,69 @@ export async function POST(req: Request) {
   if (!text) return json({ error: 'এই দিনের তথ্য পাওয়া যায়নি' }, 404)
 
   const cacheKey = `${body.commodity}|${body.date ?? 'latest'}|${body.variant ?? 'template'}`
-  const elevenKey = env('ELEVENLABS_API_KEY'), voice = env('ELEVENLABS_VOICE_ID')
-  const openRouterKey = env('OPENROUTER_API_KEY')
+  const elevenKey = env('ELEVENLABS_API_KEY')?.trim()
+  const voice = env('ELEVENLABS_VOICE_ID')?.trim()
+  const openRouterKey = env('OPENROUTER_API_KEY')?.trim()
+  let elevenErr = ''
 
   if (elevenKey && voice) {
     const cachedMp3 = mp3Cache.get(cacheKey)
     if (cachedMp3) {
       return new Response(new Uint8Array(cachedMp3), {
-        headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' },
+        headers: {
+          'content-type': 'audio/mpeg',
+          'cache-control': 'no-store',
+          'x-tts-provider': 'elevenlabs-cache',
+        },
       })
     }
+    const voicesToTry = voice === DEFAULT_FREE_VOICE ? [voice] : [voice, DEFAULT_FREE_VOICE]
     try {
-      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(20_000),
-        headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
-        body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_v3' }),
-      })
-      if (r.ok) {
-        const mp3 = Buffer.from(await r.arrayBuffer())
-        if (mp3.length > 0) {
-          mp3Cache.set(cacheKey, mp3)
-          return new Response(new Uint8Array(mp3), {
-            headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' },
-          })
+      for (const v of voicesToTry) {
+        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(v)}`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(20_000),
+          headers: { 'xi-api-key': elevenKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
+          body: JSON.stringify({ text: text.slice(0, 2000), model_id: env('ELEVENLABS_MODEL') || 'eleven_v3' }),
+        })
+        if (r.ok) {
+          const mp3 = Buffer.from(await r.arrayBuffer())
+          if (mp3.length > 0) {
+            mp3Cache.set(cacheKey, mp3)
+            return new Response(new Uint8Array(mp3), {
+              headers: {
+                'content-type': 'audio/mpeg',
+                'cache-control': 'no-store',
+                'x-tts-provider': v === voice ? 'elevenlabs' : 'elevenlabs-premade',
+              },
+            })
+          }
         }
+        const errText = (await r.text()).slice(0, 300)
+        console.error('[tts] elevenlabs failed', { voice: v, status: r.status, body: errText })
+        elevenErr = String(r.status)
+        if (r.status === 401) break
       }
-      if (!openRouterKey) return json({ error: `voice error ${r.status}` }, 502)
-    } catch {
+      if (!openRouterKey) return json({ error: `voice error ${elevenErr || '502'}` }, 502)
+    } catch (e) {
+      console.error('[tts] elevenlabs exception', String(e).slice(0, 200))
+      elevenErr = 'exception'
       if (!openRouterKey) return json({ error: 'voice error' }, 502)
     }
   }
 
   if (!openRouterKey) return json({ error: 'server voice not configured' }, 501)
 
+  const wavHeaders: Record<string, string> = {
+    'content-type': 'audio/wav',
+    'cache-control': 'no-store',
+    'x-tts-provider': 'openrouter',
+  }
+  if (elevenErr) wavHeaders['x-tts-fallback-reason'] = `elevenlabs_${elevenErr}`
+
   const cached = wavCache.get(cacheKey)
   if (cached) {
-    return new Response(new Uint8Array(cached), {
-      headers: { 'content-type': 'audio/wav', 'cache-control': 'no-store' },
-    })
+    return new Response(new Uint8Array(cached), { headers: wavHeaders })
   }
 
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -102,7 +127,5 @@ export async function POST(req: Request) {
 
   const wav = pcm16ToWav(pcm, 24_000)
   wavCache.set(cacheKey, wav)
-  return new Response(new Uint8Array(wav), {
-    headers: { 'content-type': 'audio/wav', 'cache-control': 'no-store' },
-  })
+  return new Response(new Uint8Array(wav), { headers: wavHeaders })
 }
