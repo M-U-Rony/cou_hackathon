@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { FairCompare } from './data'
 import {
-  EVENT_TITLE_BN, TONE_BN, TONE_HELP, addDays, bn, bnDate, bnMonthYear, bnNum, bnPrice,
-  daysBetween, fairAt, fairEventLead, plain, tone,
+  EVENT_TITLE_BN, SURGE_BN, TONE_BN, TONE_HELP, TRUST_BN, addDays, bn, bnDate, bnMonthYear, bnNum, bnPrice,
+  daysBetween, fairAt, fairEventLead, isEmerging, plain, tone,
 } from './data'
 
 describe('bn / bnNum / bnPrice', () => {
@@ -158,5 +158,20 @@ describe('EVENT_TITLE_BN', () => {
   it('has a title for each known event id', () => {
     expect(Object.keys(EVENT_TITLE_BN)).toContain('onion_india_ban_2023')
     expect(Object.values(EVENT_TITLE_BN).every(Boolean)).toBe(true)
+  })
+})
+
+describe('early surge & reporting trust helpers', () => {
+  it('detects emerging surge only while status is Normal', () => {
+    expect(isEmerging({ status: 'Normal', surge_stage: 'emerging' })).toBe(true)
+    expect(isEmerging({ status: 'Watch', surge_stage: 'emerging' })).toBe(false)
+    expect(isEmerging({ status: 'Normal', surge_stage: 'none' })).toBe(false)
+  })
+
+  it('defines Bangla labels for all surge stages and trust levels', () => {
+    expect(Object.keys(SURGE_BN)).toEqual(['none', 'emerging', 'confirmed'])
+    expect(Object.keys(TRUST_BN)).toEqual(['high', 'caution', 'degraded'])
+    expect(Object.values(SURGE_BN).every(Boolean)).toBe(true)
+    expect(Object.values(TRUST_BN).every(Boolean)).toBe(true)
   })
 })

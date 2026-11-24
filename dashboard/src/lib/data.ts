@@ -2,6 +2,8 @@
 // (written by modeling/export_dashboard.py).
 
 export type Status = 'Normal' | 'Watch' | 'Unusual'
+export type SurgeStage = 'none' | 'emerging' | 'confirmed'
+export type DataTrust = 'high' | 'caution' | 'degraded'
 
 export interface WaterfallStep {
   key: string
@@ -22,7 +24,16 @@ export interface Day {
   status: Status
   direction: '' | 'up' | 'down'
   unexplained_pct: number
+  reason?: string
   baseline_status: Status
+  surge_stage?: SurgeStage
+  surge_score?: number
+  surge_reason?: string
+  data_trust?: DataTrust
+  obs_gap_days?: number
+  band_inflation?: number
+  unit_status?: string
+  trust_note_bn?: string
   text_bn?: string
   waterfall?: WaterfallStep[]
 }
@@ -39,6 +50,9 @@ export interface EventEval {
   first_unusual: string | null
   lead_days_to_peak: number | null
   detected: boolean
+  first_emerging?: string | null
+  emerging_lead_days_to_peak?: number | null
+  days_before_confirmed?: number | null
 }
 
 export interface FPEvent {
@@ -115,10 +129,29 @@ export function fairEventLead(fc: FairCompare | null | undefined, eventId: strin
   return { model: r?.model ?? null, baseline: r?.baseline ?? null }
 }
 
+export interface ResilienceSummary {
+  early_surge: {
+    events_total: number
+    events_flagged_before_confirm: number
+    median_extra_lead_days: number
+    max_extra_lead_days: number
+    mean_normal_emerging_per_100d: number
+  }
+  reporting_guard: {
+    gap_widened_days: number
+    caution_days: number
+    degraded_days: number
+    post_gap_capped_days: number
+    quarantined_implicit_unit_rows: number
+    converted_explicit_unit_rows: number
+  }
+}
+
 export interface FPData {
   fair_compare?: FairCompare | null
   markets?: Record<string, MarketData>
   spread?: Record<string, SpreadData>
+  resilience?: ResilienceSummary
   generated: string
   horizon_days: number
   note_bn: string
@@ -181,6 +214,21 @@ export const TONE_HELP: Record<Tone, string> = {
   alarm: 'দাম অনেক বেশি; মৌসুম, উৎসব বা আগের দাম দিয়ে ব্যাখ্যা হয় না',
   down: 'দাম প্রত্যাশার চেয়ে কম; ক্রেতার জন্য চিন্তার কিছু নেই',
 }
+
+export const SURGE_BN: Record<SurgeStage, string> = {
+  none: 'স্থিতিশীল',
+  emerging: 'আগাম ঊর্ধ্বমুখী চাপ',
+  confirmed: 'নিশ্চিত অসঙ্গতি',
+}
+
+export const TRUST_BN: Record<DataTrust, string> = {
+  high: 'নির্ভরযোগ্য তথ্য',
+  caution: 'সতর্ক পর্যবেক্ষণ',
+  degraded: 'তথ্য অসঙ্গতি (অ্যালার্ম স্থগিত)',
+}
+
+export const isEmerging = (d: Pick<Day, 'surge_stage' | 'status'>) =>
+  d.surge_stage === 'emerging' && d.status === 'Normal'
 
 export const EVENT_TITLE_BN: Record<string, string> = {
   onion_india_ban_2023: 'ভারতের পেঁয়াজ রপ্তানি নিষেধ, ডিসেম্বর ২০২৩',

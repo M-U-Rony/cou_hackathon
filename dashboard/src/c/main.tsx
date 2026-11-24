@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BandChart, Waterfall } from '../lib/charts'
 import type { FPData, FPEvent } from '../lib/data'
 import { fairEventLead } from '../lib/data'
-import { EVENT_TITLE_BN, TONE_BN, bnDate, bnNum, bnPrice, daysBetween, loadData, tone } from '../lib/data'
+import { EVENT_TITLE_BN, TONE_BN, TRUST_BN, bnDate, bnNum, bnPrice, daysBetween, isEmerging, loadData, tone } from '../lib/data'
 import './style.css'
 
 const SPEEDS = [1, 2, 4]
@@ -44,11 +44,15 @@ function Replay({ data, ev }: { data: FPData; ev: FPEvent }) {
   const d = days[i]
   const t = tone(d)
   const flag = ev.model?.first_flag ?? null
+  const earlyFlag = ev.model?.first_emerging ?? null
+  const hasPreConfirm = !!earlyFlag && (!flag || earlyFlag < flag)
+  const earlyReached = hasPreConfirm && d.date >= earlyFlag
   const flagged = !!flag && d.date >= flag
   const toPeak = daysBetween(d.date, ev.peak)
   const markers = [
     { date: ev.peak, label: 'পিক', color: 'var(--c-alarm)' },
     ...(flagged ? [{ date: flag!, label: 'প্রথম সংকেত', color: 'var(--c-watch)' }] : []),
+    ...(earlyReached ? [{ date: earlyFlag!, label: 'আগাম চাপ', color: 'var(--c-surge)' }] : []),
   ]
   const pos = (date: string) => {
     const k = days.findIndex((x) => x.date >= date)
@@ -80,8 +84,20 @@ function Replay({ data, ev }: { data: FPData; ev: FPEvent }) {
             <div>
               <div className="st">{TONE_BN[t]}</div>
               <div className="sub">প্রত্যাশিত {bnNum(d.lo80)}–{bnNum(d.hi80)} ৳, আসল {bnPrice(d.price)} ৳</div>
+              {isEmerging(d) && (
+                <div className="em-badge">▲ আগাম ঊর্ধ্বমুখী চাপ ({bnNum(Math.round((d.surge_score ?? 0.6) * 100))}%)</div>
+              )}
+              {d.data_trust && d.data_trust !== 'high' && (
+                <div className="trust-badge">{TRUST_BN[d.data_trust]}</div>
+              )}
             </div>
           </div>
+          {earlyReached && (
+            <div className="callout callout-surge">
+              <b>আগাম চাপ শনাক্ত: {bnDate(earlyFlag!)}{ev.model?.days_before_confirmed ? ` (নিশ্চিত সংকেতের ${bnNum(ev.model.days_before_confirmed)} দিন আগে)` : ''}</b>
+              <span>অ্যানোমালি ডিটেক্টর নিশ্চিত করার আগেই ব্যান্ডের ভেতরের গতি ও চাপ থেকে আগাম সতর্কতা।</span>
+            </div>
+          )}
           {flagged && ev.model?.lead_days_to_peak != null && (
             <div className="callout">
               <b>প্রথম সংকেত {bnDate(flag!)}, পিকের {bnNum(ev.model.lead_days_to_peak)} দিন আগে</b>
@@ -111,6 +127,7 @@ function Replay({ data, ev }: { data: FPData; ev: FPEvent }) {
           </button>
           <button className="btn" onClick={() => step(1)} aria-label="এক দিন সামনে">▶</button>
           <div className="track">
+            {hasPreConfirm && <span className="tick surge" style={{ left: pos(earlyFlag!) }}>আগাম</span>}
             {flag && <span className="tick flag" style={{ left: pos(flag) }}>সংকেত</span>}
             <span className="tick" style={{ left: pos(ev.peak) }}>পিক</span>
             <input id="scrub" type="range" min={0} max={days.length - 1} value={i} aria-label="তারিখ বেছে নিন"

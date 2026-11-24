@@ -20,26 +20,26 @@ flowchart LR
     end
 
     subgraph Pipeline["Automated Pipeline (pipeline/)"]
-        FETCH["fetch_daily.py\n(GitHub Actions 18:30 BST)"]
-        CLEAN["clean_tcb.py\nbuild_extra_history.py\nbuild_markets.py"]
+        FETCH["fetch_daily.py\n(GitHub Actions 18:30 & 22:30 BST)"]
+        CLEAN["clean_tcb.py + reporting_guard.py\n(Unit Normalization & Gap Guard)"]
     end
 
     subgraph ML["Walk-Forward ML Engine (modeling/)"]
         LGBM["5× LightGBM Quantile Regressors\n(0.025, 0.10, 0.50, 0.90, 0.975)\nTarget: log(P_t / P_{t-14})"]
-        CQR["Conformalized Quantile Regression\n(Trailing 20% Past Calibration)"]
-        SHAP["TreeSHAP Exact BDT Waterfall\n+ Deterministic Bangla Templates"]
+        CQR["Conformalized Quantile Regression\n+ Diffusive Gap Band Widening"]
+        SURGE["early_surge.py + TreeSHAP\n(Pre-Confirmation Surge & BDT Waterfall)"]
     end
 
     subgraph App["Production Web App (dashboard/)"]
         UI["React 19 + TS + Custom SVG Charts\nindex.html (Monitor), landing.html, login.html & replay.html"]
-        GUARD["Serverless API (api/)\nClaude + Number-Guard + ElevenLabs TTS\nOptional scrypt + HMAC-SHA256 Auth & Watchlist (api/auth.ts)"]
+        GUARD["Serverless API (api/)\nOpenRouter + Number-Guard + ElevenLabs TTS\nOptional scrypt + HMAC-SHA256 Auth & Watchlist"]
     end
 
     TCB --> FETCH --> CLEAN
     EXT --> FETCH
     MKT --> CLEAN
-    CLEAN --> LGBM --> CQR --> SHAP --> UI
-    SHAP --> GUARD --> UI
+    CLEAN --> LGBM --> CQR --> SURGE --> UI
+    SURGE --> GUARD --> UI
 ```
 
 ---
@@ -80,6 +80,15 @@ When thresholds are calibrated so both methods emit the **exact same false-alarm
 | Oct 2024 Farm Egg Spike | `egg_farm` | 2024-10-15 | 2024-10-01 | **14 days** |
 | Autumn 2026 Egg Record | `egg_farm` | 2026-10-11 | 2026-09-28 | **13 days** |
 | Nov 2025 Onion Spike | `onion_local` | 2025-11-10 | 2025-11-03 | **7 days** |
+
+### 4. Final Hackathon Extensions (Pre-Confirmation Early Surge & Reporting Resilience)
+
+1. **Challenge 1 — Pre-Confirmation Emerging Price Surge (`modeling/early_surge.py`):**
+   - Dual-channel strictly causal detector (**Pressure Buildup**: ≥2 recent observations at `score >= 0.50` across `<= 4d` gaps with rising pressure `dscore5 >= 0.15` and `ret7 > 0.5%`; **Velocity Shock**: sharp 3-day acceleration `ret3 >= max(8%, 2.5 * lagged vol28)` with `dscore3 >= 0.80`) fires **`emerging` while `status == Normal`** — **before** `Watch`/`Unusual` confirmation.
+   - Across `data/events.csv`, flags **6 / 7 historical crises strictly before confirmation** (median **+3.0 days**, up to **+40 days** on Spring 2026 Eggs and **+11 days** on Jul 2026 Green Chili) at only **2.46 / 100 normal days**.
+2. **Challenge 2 — Missing, Late & Unit-Inconsistent Reporting Guard (`pipeline/reporting_guard.py`):**
+   - **Unit Canonicalization & Implicit Mismatch Guard:** Automatically converts explicit alternate Bengali/English retail units (`ডজন`, `পিস`, `১০০ পিস`, `পাল্লা/৫ কেজি`, `২৫০ গ্রাম`, `মণ`, `কুইন্টাল`), drops invalid `<= 0` or incompatible prices (`8` zero-price `onion_import` rows removed), and causally quarantines unlabelled scale glitches (`7` corrupted pre-TCB `green_chili` rows quarantined — improving `green_chili` 80% coverage `77.6% → 79.0%` and narrowing median width `101.5% → 96.3%`).
+   - **Diffusive Band Widening & Signal Trust Policy:** Inflates conformal intervals by $\sqrt{H_{\text{eff}}/H}$ across missing/late weeks (`190` gap-widened days across walk-forward history), resets consecutive streaks over `> 4d` holes, caps isolated post-gap outliers to `Watch`, and exposes `data_trust` (`high` / `caution` / `degraded`) in `fairprice_data.json` and the UI.
 
 ---
 

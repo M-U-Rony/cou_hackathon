@@ -23,11 +23,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+_ROOT_DIR = Path(__file__).resolve().parents[1]
+for _p in (_ROOT_DIR / "pipeline", _ROOT_DIR / "modeling"):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+
+from early_surge import detect_emerging_surge, gap_aware_streak  # noqa: E402
+from reporting_guard import (  # noqa: E402
+    assess_reporting_trust,
+    flag_implicit_unit_mismatches,
+    staleness_band_scale,
+)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -183,6 +196,9 @@ def build_features(s: pd.Series, commodity: str | None = None) -> pd.DataFrame:
     f["doy_cos"] = np.cos(2 * np.pi * doy / 365.25)
     f["month"] = f.index.month
     f["gap_days"] = (f.index - pd.to_datetime(last_obs)).dt.days
+    obs_idx = s.index[s.notna()]
+    obs_gap = pd.Series(obs_idx, index=obs_idx).diff().dt.days.fillna(1)
+    f["obs_gap_days"] = obs_gap.reindex(f.index).fillna(1).astype(int)
     f = f.join(calendar_features(f.index))
     f = f.join(fx_features(f.index)).join(rain_features(f.index, commodity))
 
@@ -252,16 +268,28 @@ def predict_block(models, adj, test: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame(index=test.index)
     ref = np.exp(test["ref"])
     preds = {k: m.predict(test[FEATS]) for k, m in models.items()}
-    out["mid"] = ref * np.exp(preds["mid"])
+    mid_log = preds["mid"]
+    out["mid"] = ref * np.exp(mid_log)
     out["ref_price"] = ref
     if HAVE_LGB:  # TreeSHAP of the median model, in log-return units
         contrib = models["mid"].predict(test[FEATS], pred_contrib=True)
         for i, k in enumerate(FEATS):
             out[f"shap_{k}"] = contrib[:, i]
         out["shap_bias"] = contrib[:, -1]
+
+    if "gap_days" in test.columns or "obs_gap_days" in test.columns:
+        gap = test["gap_days"] if "gap_days" in test.columns else pd.Series(H, index=test.index)
+        ogap = test["obs_gap_days"] if "obs_gap_days" in test.columns else pd.Series(1, index=test.index)
+        scale = staleness_band_scale(gap, ogap, horizon=H)
+    else:
+        scale = np.ones(len(test), dtype=float)
+    out["band_inflation"] = np.round(scale, 4)
+
     for band in ("80", "95"):
-        lo = np.minimum(preds[f"lo{band}"], preds["mid"]) - adj[band]
-        hi = np.maximum(preds[f"hi{band}"], preds["mid"]) + adj[band]
+        lo_raw = np.minimum(preds[f"lo{band}"], mid_log) - adj[band]
+        hi_raw = np.maximum(preds[f"hi{band}"], mid_log) + adj[band]
+        lo = mid_log - scale * (mid_log - lo_raw)
+        hi = mid_log + scale * (hi_raw - mid_log)
         out[f"lo{band}"] = ref * np.exp(lo)
         out[f"hi{band}"] = ref * np.exp(hi)
     return out
@@ -274,11 +302,11 @@ def predict_block(models, adj, test: pd.DataFrame) -> pd.DataFrame:
 STEADY_SCORE, STEADY_DAYS = 0.6, 5
 
 
-def steady_rise(y, mid, hi80):
+def steady_rise(y, mid, hi80, dates=None, max_gap: int = 4):
     score = np.log(y / mid) / np.log(np.maximum(hi80 / mid, 1 + 1e-6))
-    above = (score > STEADY_SCORE).astype(int)
-    run = above.groupby((above == 0).cumsum()).cumsum()
-    return run >= STEADY_DAYS
+    above = score > STEADY_SCORE
+    idx_dates = dates if dates is not None else (y.index if isinstance(y.index, pd.DatetimeIndex) else None)
+    return gap_aware_streak(above, dates=idx_dates, max_gap=max_gap) >= STEADY_DAYS
 
 
 def flag(y, lo80, hi80, lo95, hi95):
@@ -321,21 +349,49 @@ def evaluate(res: pd.DataFrame, events: pd.DataFrame, commodity: str):
         width80 = ((res[f"{name}_hi80"] - res[f"{name}_lo80"]) / res.y_price).median()
         normal = ~in_event
         fa = ((st == "Unusual") & normal).sum() / max(1, normal.sum()) * 100
-        rows.append(dict(commodity=commodity, method=name, n_days=len(res),
-                         coverage80=round(cov80, 3), coverage95=round(cov95, 3),
-                         median_width80_pct=round(width80 * 100, 1),
-                         unusual_per100_normal_days=round(fa, 2)))
+        row_m = dict(commodity=commodity, method=name, n_days=len(res),
+                     coverage80=round(cov80, 3), coverage95=round(cov95, 3),
+                     median_width80_pct=round(width80 * 100, 1),
+                     unusual_per100_normal_days=round(fa, 2))
+        if name == "model":
+            em_rate = ((res["surge_stage"] == "emerging") & normal).sum() / max(1, normal.sum()) * 100 if "surge_stage" in res.columns else 0.0
+            row_m["emerging_per100_normal_days"] = round(float(em_rate), 2)
+            row_m["caution_days"] = int((res["data_trust"] == "caution").sum()) if "data_trust" in res.columns else 0
+            row_m["degraded_days"] = int((res["data_trust"] == "degraded").sum()) if "data_trust" in res.columns else 0
+            row_m["gap_widened_days"] = int((res["band_inflation"] > 1.01).sum()) if "band_inflation" in res.columns else 0
+        else:
+            row_m["emerging_per100_normal_days"] = None
+            row_m["caution_days"] = None
+            row_m["degraded_days"] = None
+            row_m["gap_widened_days"] = None
+        rows.append(row_m)
+
         for _, e in ev.iterrows():
             win = res[(res.index >= e.start - pd.Timedelta(days=30)) & (res.index <= e.peak)]
             hit = win[(win[f"{name}_status"] != "Normal") & (win[f"{name}_dir"] == "up")]
             first = hit.index.min() if len(hit) else pd.NaT
             first_u = win[(win[f"{name}_status"] == "Unusual") & (win[f"{name}_dir"] == "up")].index.min()
-            ev_rows.append(dict(event_id=e.event_id, commodity=commodity, method=name,
-                                covered_by_test=len(win) > 0,
-                                detected=pd.notna(first),
-                                first_flag=None if pd.isna(first) else first.date(),
-                                first_unusual=None if pd.isna(first_u) else first_u.date(),
-                                lead_days_to_peak=None if pd.isna(first) else (e.peak - first).days))
+            ev_rec = dict(event_id=e.event_id, commodity=commodity, method=name,
+                          covered_by_test=len(win) > 0,
+                          detected=pd.notna(first),
+                          first_flag=None if pd.isna(first) else first.date(),
+                          first_unusual=None if pd.isna(first_u) else first_u.date(),
+                          lead_days_to_peak=None if pd.isna(first) else (e.peak - first).days)
+            if name == "model" and "surge_stage" in win.columns:
+                hit_em = win[win["surge_stage"] == "emerging"]
+                first_em = hit_em.index.min() if len(hit_em) else pd.NaT
+                ev_rec["first_emerging"] = None if pd.isna(first_em) else first_em.date()
+                ev_rec["emerging_lead_days_to_peak"] = None if pd.isna(first_em) else (e.peak - first_em).days
+                ev_rec["days_before_confirmed"] = (
+                    int((first - first_em).days)
+                    if (pd.notna(first_em) and pd.notna(first) and first_em < first)
+                    else (0 if pd.notna(first_em) else None)
+                )
+            else:
+                ev_rec["first_emerging"] = None
+                ev_rec["emerging_lead_days_to_peak"] = None
+                ev_rec["days_before_confirmed"] = None
+            ev_rows.append(ev_rec)
     return rows, ev_rows
 
 
@@ -420,23 +476,33 @@ def main():
     events = pd.read_csv(EVENTS, parse_dates=["start", "peak", "end"])
 
     metrics, ev_all, expl_all, imps = [], [], [], {}
+    resilience_audit: dict[str, dict] = {}
     for c in args.commodities:
         use_cal = args.calendar == "all" or (args.calendar == "auto" and c in CALENDAR_FOR)
         use_fx = args.fx == "all" or (args.fx == "auto" and c in FX_FOR)
         use_rain = args.rain == "all" or (args.rain == "auto" and c in RAIN_FOR)
         FEATS = (list(BASE_FEATS) + (CAL_FEATS if use_cal else [])
                  + (FX_FEATS if use_fx else []) + (RAIN_FEATS if use_rain else []))
-        s = data[data.commodity == c].set_index("date")["p_mid"]
+        raw_c = data[data.commodity == c].sort_values("date").drop_duplicates("date", keep="last")
+        s_raw = raw_c.set_index("date")["p_mid"]
+        ucheck = flag_implicit_unit_mismatches(s_raw, c)
+        s = ucheck["clean_price"].dropna()
         f = build_features(s, c)
         FEATS = [k for k in FEATS if k in f.columns]
         print(f"{c}: {len(FEATS)} features"
               + (" +calendar" if use_cal else "") + (" +fx" if use_fx and "fx_chg30_lag30" in f else "")
-              + (" +rain" if use_rain and "rain_30" in f else ""))
+              + (" +rain" if use_rain and "rain_30" in f else "")
+              + (f" (unit-guard quarantined {int(ucheck['unit_suspect'].sum())} rows)" if ucheck["unit_suspect"].any() else ""))
         res = walk_forward(f, args.test_start, args.step_months)
         if res is None:
             print(f"{c}: skipped (not enough history, {len(f)} rows)")
             continue
-        res = res.join(f[["y_price", "base_mid", "base_sd"]])
+        res = res.join(f[["y_price", "base_mid", "base_sd", "gap_days", "obs_gap_days"]])
+        if "unit_status" in raw_c.columns:
+            ust = raw_c.set_index("date")["unit_status"].reindex(res.index).fillna("canonical")
+            res["unit_status"] = ust
+        else:
+            res["unit_status"] = "canonical"
         res.columns = ["model_" + k if k in ("mid", "lo80", "hi80", "lo95", "hi95") else k for k in res.columns]
         res["commodity"] = c
         res["baseline_mid"] = res.base_mid
@@ -448,13 +514,25 @@ def main():
             res[f"{name}_status"], res[f"{name}_dir"] = flag(
                 res.y_price, res[f"{name}_lo80"], res[f"{name}_hi80"],
                 res[f"{name}_lo95"], res[f"{name}_hi95"])
-        steady = steady_rise(res.y_price, res.model_mid, res.model_hi80) & (res.model_status == "Normal")
+        steady = steady_rise(res.y_price, res.model_mid, res.model_hi80, dates=res.index) & (res.model_status == "Normal")
         res.loc[steady, "model_status"] = "Watch"
         res.loc[steady, "model_dir"] = "up"
         res["model_reason"] = np.where(steady, "steady_rise",
                                        np.where(res.model_status != "Normal", "outside_range", ""))
+        res = assess_reporting_trust(res, commodity=c)
+        res = detect_emerging_surge(res)
         res["unexplained_pct"] = (res.y_price / res.model_mid - 1) * 100
         res.drop(columns=["base_mid", "base_sd"]).round(4).to_csv(OUT / f"{c}_predictions.csv", index_label="date")
+
+        resilience_audit[c] = dict(
+            quarantined_implicit_unit_rows=int(ucheck["unit_suspect"].sum()),
+            converted_explicit_unit_rows=int((res["unit_status"] == "converted").sum()),
+            gap_widened_days=int((res["band_inflation"] > 1.01).sum()),
+            caution_days=int((res["data_trust"] == "caution").sum()),
+            degraded_days=int((res["data_trust"] == "degraded").sum()),
+            post_gap_capped_days=int((res["model_reason"] == "post_gap_caution").sum()),
+            emerging_days=int((res["surge_stage"] == "emerging").sum()),
+        )
 
         m, e = evaluate(res, events, c)
         metrics += m
@@ -469,6 +547,7 @@ def main():
 
     pd.DataFrame(metrics).to_csv(OUT / "metrics.csv", index=False)
     pd.DataFrame(ev_all).to_csv(OUT / "events_eval.csv", index=False)
+    (OUT / "resilience_audit.json").write_text(json.dumps(resilience_audit, indent=2, ensure_ascii=False))
     if expl_all:
         pd.concat(expl_all).to_csv(OUT / "explanations_latest.csv", index=False)
         (OUT / "feature_importance.json").write_text(json.dumps(imps, indent=2, ensure_ascii=False))

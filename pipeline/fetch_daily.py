@@ -26,8 +26,9 @@ from bs4 import BeautifulSoup
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Reuse exact normalization and commodity regexes from clean_tcb.py
+# Reuse exact normalization, commodity regexes, and reporting hygiene guard
 from clean_tcb import CORE, STOP, norm, num
+from reporting_guard import normalize_unit_price, sanitize_tcb_core
 
 ROOT = Path(__file__).resolve().parents[1]
 TCB_CORE = ROOT / "data/processed/tcb_core.csv"
@@ -112,17 +113,23 @@ def _parse_tcb_xlsx(content: bytes, file_url: str, fallback_date: str | None) ->
         seen.add(key)
         for code, rx in CORE.items():
             if rx.search(key):
+                norm_px = normalize_unit_price(code, c1, p_min, p_max)
+                if not norm_px["valid"]:
+                    continue
                 rows.append(
                     dict(
                         date=report_date,
                         commodity=code,
                         item=c0,
-                        unit=c1,
-                        p_min=p_min,
-                        p_max=p_max,
-                        p_mid=(p_min + p_max) / 2.0,
+                        unit=norm_px["unit"],
+                        p_min=norm_px["p_min"],
+                        p_max=norm_px["p_max"],
+                        p_mid=norm_px["p_mid"],
                         date_source=date_source,
                         file_url=file_url,
+                        raw_unit=norm_px["raw_unit"],
+                        unit_status=norm_px["unit_status"],
+                        unit_factor=norm_px["unit_factor"],
                     )
                 )
     return rows
@@ -180,13 +187,14 @@ def update_tcb(max_files: int = 10) -> int:
 
     combined = pd.concat([existing, pd.DataFrame(new_rows)], ignore_index=True)
     combined["date"] = pd.to_datetime(combined["date"]).dt.strftime("%Y-%m-%d")
+    combined, audit = sanitize_tcb_core(combined)
     combined = (
         combined.sort_values(["commodity", "date"])
         .drop_duplicates(["commodity", "date"], keep="last")
     )
     added = len(combined) - len(existing)
     combined.to_csv(TCB_CORE, index=False)
-    print(f"[tcb] added {added} new commodity-day rows (latest: {combined['date'].max()})")
+    print(f"[tcb] added {added} new commodity-day rows (latest: {combined['date'].max()}, guard={audit})")
     return added
 
 

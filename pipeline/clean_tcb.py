@@ -6,10 +6,16 @@ Output: data/processed/tcb_all_long.csv     (every commodity: date, item, unit, 
         data/processed/tcb_qc.txt           (quality report)
 """
 import re
+import sys
 import unicodedata
 from pathlib import Path
 
 import pandas as pd
+
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from reporting_guard import sanitize_tcb_core  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data/raw/tcb_prices_2021_2026.csv"
@@ -103,12 +109,16 @@ def main():
     core = core[["date", "commodity", "item", "c1", "p_min", "p_max", "p_mid", "date_source", "file_url"]].rename(
         columns={"c1": "unit"}
     )
+    core, audit = sanitize_tcb_core(core)
     core.to_csv(OUT / "tcb_core.csv", index=False)
 
     # QC report
     lines = [f"raw rows: {len(df)}  price rows (all items, deduped): {len(long)}",
              f"distinct dates: {long['date'].nunique()}  range: {long['date'].min().date()} .. {long['date'].max().date()}",
-             f"distinct item names: {long['item'].nunique()}", ""]
+             f"distinct item names: {long['item'].nunique()}",
+             f"unit/price guard: kept={audit['kept']} converted={audit['converted']} "
+             f"dropped_invalid_price={audit['dropped_invalid_price']} dropped_incompatible_unit={audit['dropped_incompatible_unit']}",
+             ""]
     for code, g in core.groupby("commodity"):
         g = g.sort_values("date")
         gaps = g["date"].diff().dt.days

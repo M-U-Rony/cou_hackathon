@@ -19,6 +19,7 @@ type Step = { key: string; label: string; value: number; kind: string }
 type Day = {
   date: string; price: number; mid: number; lo80: number; hi80: number; status: string
   direction: string; unexplained_pct: number; reason?: string; text_bn?: string; waterfall?: Step[]
+  surge_stage?: string; surge_score?: number; data_trust?: string; trust_note_bn?: string
 }
 type Data = {
   commodities: Record<string, { name_bn: string; unit_bn: string; latest: Day }>
@@ -115,6 +116,10 @@ export function factSheet(f: { day: Day; name: string; unit: string }) {
     `প্রত্যাশার চেয়ে পার্থক্য: ${Math.round(d.unexplained_pct)}%`,
     ...steps.map((s) => `উপাদান: ${s.label}, ${s.value > 0 ? '+' : '−'}${Math.abs(s.value).toFixed(1)} টাকা`),
     d.reason === 'steady_rise' ? 'বিশেষ: দাম কয়েক দিন ধরে সীমার উপরের দিকে আছে' : '',
+    d.surge_stage === 'emerging' && d.status === 'Normal'
+      ? `আগাম ঊর্ধ্বমুখী চাপ: চাপ সূচক ${Math.round((d.surge_score ?? 0.6) * 100)}% (নিশ্চিত অসঙ্গতির আগেই প্রাথমিক সতর্কতা)`
+      : '',
+    d.trust_note_bn ? `তথ্য সতর্কতা: ${d.trust_note_bn}` : '',
   ].filter(Boolean)
   return lines.join('\n')
 }

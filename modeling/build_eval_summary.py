@@ -57,24 +57,27 @@ def build_summary(data: dict[str, Any]) -> dict[str, Any]:
     for ev in data.get("events", []):
         m = ev.get("model") or {}
         b = ev.get("baseline") or {}
-        events_out.append(
-            {
-                "event_id": ev["event_id"],
-                "commodity": ev["commodity"],
-                "description": ev.get("description"),
-                "start": ev.get("start"),
-                "peak": ev.get("peak"),
-                "end": ev.get("end"),
-                "model_detected": m.get("detected"),
-                "model_first_flag": m.get("first_flag"),
-                "model_lead_days": m.get("lead_days_to_peak"),
-                "baseline_detected": b.get("detected"),
-                "baseline_first_flag": b.get("first_flag"),
-                "baseline_lead_days": b.get("lead_days_to_peak"),
-            }
-        )
+        item = {
+            "event_id": ev["event_id"],
+            "commodity": ev["commodity"],
+            "description": ev.get("description"),
+            "start": ev.get("start"),
+            "peak": ev.get("peak"),
+            "end": ev.get("end"),
+            "model_detected": m.get("detected"),
+            "model_first_flag": m.get("first_flag"),
+            "model_lead_days": m.get("lead_days_to_peak"),
+            "baseline_detected": b.get("detected"),
+            "baseline_first_flag": b.get("first_flag"),
+            "baseline_lead_days": b.get("lead_days_to_peak"),
+        }
+        if "first_emerging" in m:
+            item["model_first_emerging"] = m.get("first_emerging")
+            item["model_emerging_lead_days"] = m.get("emerging_lead_days_to_peak")
+            item["days_before_confirmed"] = m.get("days_before_confirmed")
+        events_out.append(item)
 
-    return {
+    out = {
         "project": "FairPrice BD",
         "generated": data.get("generated"),
         "horizon_days": data.get("horizon_days", 14),
@@ -87,6 +90,9 @@ def build_summary(data: dict[str, Any]) -> dict[str, Any]:
         "events": events_out,
         "equal_false_alarm_comparison": (data.get("fair_compare") or {}).get("summary", []),
     }
+    if data.get("resilience"):
+        out["early_surge_and_resilience"] = data["resilience"]
+    return out
 
 
 def write_summary(input_path: Path = DEFAULT_INPUT, output_path: Path = DEFAULT_OUTPUT) -> dict[str, Any]:

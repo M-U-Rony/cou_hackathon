@@ -34,14 +34,35 @@ def r2(x):
     return None if pd.isna(x) else round(float(x), 2)
 
 
+def _s(row: pd.Series, key: str, default: str = "") -> str:
+    val = row.get(key, default)
+    return val if isinstance(val, str) else default
+
+
 def day_record(row: pd.Series, commodity: str, date, with_text=False) -> dict:
+    direction = _s(row, "model_dir", "")
+    status = str(row.model_status)
+    default_stage = "confirmed" if (status != "Normal" and direction == "up") else "none"
+    surge_stage = _s(row, "surge_stage", default_stage) or default_stage
+    surge_score = r2(row["surge_score"]) if "surge_score" in row.index and pd.notna(row["surge_score"]) else (0.85 if default_stage == "confirmed" else 0.0)
+    obs_gap = int(row["obs_gap_days"]) if "obs_gap_days" in row.index and pd.notna(row["obs_gap_days"]) else 1
+    band_inf = r2(row["band_inflation"]) if "band_inflation" in row.index and pd.notna(row["band_inflation"]) else 1.0
+
     d = dict(date=str(pd.Timestamp(date).date()), price=r2(row.y_price),
              mid=r2(row.model_mid), lo80=r2(row.model_lo80), hi80=r2(row.model_hi80),
              lo95=r2(row.model_lo95), hi95=r2(row.model_hi95),
-             status=row.model_status, direction=row.model_dir if isinstance(row.model_dir, str) else "",
+             status=status, direction=direction,
              unexplained_pct=r2(row.unexplained_pct),
-             reason=row.model_reason if isinstance(row.get("model_reason", ""), str) else "",
-             baseline_status=row.baseline_status)
+             reason=_s(row, "model_reason", ""),
+             baseline_status=row.baseline_status,
+             surge_stage=surge_stage,
+             surge_score=surge_score,
+             surge_reason=_s(row, "surge_reason", ""),
+             data_trust=_s(row, "data_trust", "high") or "high",
+             obs_gap_days=obs_gap,
+             band_inflation=band_inf,
+             unit_status=_s(row, "unit_status", "canonical") or "canonical",
+             trust_note_bn=_s(row, "trust_note_bn", ""))
     if with_text:
         d["text_bn"] = paragraph(row, commodity, date)
         d["waterfall"] = [{**s, "value": round(s["value"], 2)} for s in waterfall(row)]
@@ -89,6 +110,13 @@ def plot_replay(win: pd.DataFrame, e, path):
     for st in ("Watch", "Unusual"):
         m = win.model_status == st
         ax.scatter(win.index[m], win.y_price[m], s=16, color=COLORS[st], zorder=3, label=st)
+    if "surge_stage" in win.columns:
+        em = win[win.surge_stage == "emerging"]
+        if len(em):
+            ax.scatter(em.index, em.y_price, marker="^", s=26, color="#ea580c", zorder=4, label="Emerging")
+            em0 = em[em.index >= e.start - pd.Timedelta(days=30)].index.min()
+            if pd.notna(em0):
+                ax.axvline(em0, color="#ea580c", ls="-.", lw=1)
     up = win[(win.model_status != "Normal") & (win.model_dir == "up") & (win.index >= e.start - pd.Timedelta(days=30))]
     if len(up):
         ax.axvline(up.index[0], color="#f2a900", ls="--", lw=1)
@@ -160,6 +188,34 @@ def main():
     if mk.exists():
         extra = json.loads(mk.read_text())
         data["markets"], data["spread"] = extra.get("markets", {}), extra.get("spread", {})
+
+    audit_path = MODEL / "resilience_audit.json"
+    audit = json.loads(audit_path.read_text(encoding="utf-8")) if audit_path.exists() else {}
+    ev_model = ev_eval[ev_eval["method"] == "model"] if "method" in ev_eval.columns else ev_eval
+    gains = [
+        int(x) for x in ev_model.get("days_before_confirmed", pd.Series(dtype=float)).dropna().tolist()
+        if int(x) > 0
+    ]
+    m_model = metrics[metrics["method"] == "model"] if "method" in metrics.columns else metrics
+    em_rates = m_model.get("emerging_per100_normal_days", pd.Series(dtype=float)).dropna()
+    data["resilience"] = {
+        "early_surge": {
+            "events_total": int(len(ev_model)),
+            "events_flagged_before_confirm": int(len(gains)),
+            "median_extra_lead_days": round(float(np.median(gains)), 1) if gains else 0.0,
+            "max_extra_lead_days": int(max(gains)) if gains else 0,
+            "mean_normal_emerging_per_100d": round(float(em_rates.mean()), 2) if len(em_rates) else 0.0,
+        },
+        "reporting_guard": {
+            "gap_widened_days": int(sum(v.get("gap_widened_days", 0) for v in audit.values())),
+            "caution_days": int(sum(v.get("caution_days", 0) for v in audit.values())),
+            "degraded_days": int(sum(v.get("degraded_days", 0) for v in audit.values())),
+            "post_gap_capped_days": int(sum(v.get("post_gap_capped_days", 0) for v in audit.values())),
+            "quarantined_implicit_unit_rows": int(sum(v.get("quarantined_implicit_unit_rows", 0) for v in audit.values())),
+            "converted_explicit_unit_rows": int(sum(v.get("converted_explicit_unit_rows", 0) for v in audit.values())),
+            "per_commodity": audit,
+        },
+    }
     (OUT / "fairprice_data.json").write_text(json.dumps(data, ensure_ascii=False, default=str))
     print(f"commodities: {list(data['commodities'])}")
     print(f"events replayed: {[e['event_id'] for e in data['events']]}")

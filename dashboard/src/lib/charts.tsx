@@ -4,7 +4,7 @@
 //   --c-ok --c-watch --c-alarm --c-down --c-mark
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Day, WaterfallStep } from './data'
-import { TONE_BN, bn, bnDate, bnMonthYear, bnNum, bnPrice, tone } from './data'
+import { TONE_BN, TRUST_BN, bn, bnDate, bnMonthYear, bnNum, bnPrice, isEmerging, tone } from './data'
 
 export function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null)
@@ -130,6 +130,12 @@ export function BandChart({
               <span className="cr-badge" style={{ ['--tone' as string]: `var(--c-${tone(hovered)})` }}>
                 {TONE_BN[tone(hovered)]}
               </span>
+              {isEmerging(hovered) && (
+                <span className="cr-badge cr-surge">▲ আগাম ঊর্ধ্বমুখী চাপ</span>
+              )}
+              {hovered.data_trust && hovered.data_trust !== 'high' && (
+                <span className="cr-badge cr-trust">{TRUST_BN[hovered.data_trust]}</span>
+              )}
               {hoveredOverlay && (
                 <span className="cr-item cr-wfp">{overlay?.label} (মাসিক গড়): <b>{bnNum(hoveredOverlay.price)} ৳</b></span>
               )}
@@ -181,6 +187,15 @@ export function BandChart({
             <circle key={d.date} cx={x(d.date)} cy={y(d.price)} r={compact ? 1.8 : 3}
               fill={`var(--c-${tone(d)})`} />
           ))}
+          {showDots && lineDays.filter((d) => isEmerging(d)).map((d) => {
+            const cx = x(d.date), cy = y(d.price) - (compact ? 3 : 5)
+            const r = compact ? 2.8 : 4
+            return (
+              <polygon key={`em-${d.date}`} className="emerging-dot"
+                points={`${cx},${cy - r} ${cx + r},${cy + r} ${cx - r},${cy + r}`}
+                fill="var(--c-surge, #c2410c)" />
+            )
+          })}
           {overlay?.points.map((p) => {
             const cx = x(p.date)
             // outliers are pinned to the plot edge; the title still states the true price

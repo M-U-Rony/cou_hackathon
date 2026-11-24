@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { BandChart, MultiLine, OverlayLegendItem, OverlayNote, RangeBar, Waterfall } from '../lib/charts'
 import type { Commodity, Day, FairRow, FPData, MarketData, SpreadData, Tone } from '../lib/data'
 import {
-  EVENT_TITLE_BN, TONE_BN, TONE_HELP, addDays, fairAt, fairEventLead, bnDate, bnMonthYear, bnNum, bnPrice, loadData, plain, tone,
+  EVENT_TITLE_BN, SURGE_BN, TONE_BN, TONE_HELP, TRUST_BN, addDays, fairAt, fairEventLead, bnDate, bnMonthYear, bnNum, bnPrice, isEmerging, loadData, plain, tone,
 } from '../lib/data'
 import { DEFAULT_DISTRICT, allDistricts, districtOverlay, marketLabel, resolveDistrict } from '../lib/markets'
 import { checkAvailable, localRange } from '../lib/localcheck'
@@ -26,8 +26,8 @@ const toHash = (k: string) => k.replace(/_/g, '-')
 const CAN_DOWNLOAD = (() => { try { return window.self === window.top } catch { return false } })()
 
 function downloadCsv(c: Commodity, k: string) {
-  const head = 'date,price_tk,expected_low80,expected_high80,expected_low95,expected_high95,verdict'
-  const rows = c.series.map((d) => [d.date, d.price, d.lo80, d.hi80, d.lo95, d.hi95, TONE_BN[tone(d)]].join(','))
+  const head = 'date,price_tk,expected_low80,expected_high80,expected_low95,expected_high95,verdict,surge_stage,data_trust'
+  const rows = c.series.map((d) => [d.date, d.price, d.lo80, d.hi80, d.lo95, d.hi95, TONE_BN[tone(d)], d.surge_stage ?? 'none', d.data_trust ?? 'high'].join(','))
   const blob = new Blob(['\ufeff' + [head, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
@@ -70,7 +70,10 @@ function Item({ k, c, current, stale, onPick }: {
       {stale
         ? <span className="wk" style={{ justifySelf: 'start', gridColumn: '1 / -1' }}>TCB শেষ দর দিয়েছে {bnDate(d.date)}</span>
         : <>
-          <span className="verdict">{TONE_BN[t]}</span>
+          <span className="verdict">
+            {TONE_BN[t]}
+            {isEmerging(d) && <span className="surge-chip">▲ আগাম চাপ</span>}
+          </span>
           <span className="wk">{w ? `গত সপ্তাহে ${bnPrice(w.price)} ৳` : ''}</span>
           <span className="rb"><RangeBar d={d} width={170} /></span>
         </>}
@@ -313,6 +316,16 @@ function Detail({ data, k, desktop, latestAll, onBack, health, district, user, o
         )}
       </div>
       <p className="help">{stale ? 'ফেব্রুয়ারি ২০২৬-এর পর TCB এই পণ্যের দর প্রকাশ করছে না, তাই এটা শেষ পাওয়া দিনের অবস্থা।' : TONE_HELP[t]}</p>
+      <div className="signal-strip" aria-label="আগাম চাপ ও তথ্যের মান">
+        <span className={`sig-pill sig-${d.surge_stage ?? 'none'}`}>
+          {isEmerging(d) ? '▲ ' : ''}{SURGE_BN[d.surge_stage ?? 'none']}
+          {d.surge_score != null && <> · চাপ সূচক {bnNum(Math.round(d.surge_score * 100))}%</>}
+        </span>
+        <span className={`sig-pill trust-${d.data_trust ?? 'high'}`}>
+          ডেটা মান: {TRUST_BN[d.data_trust ?? 'high']}
+        </span>
+        {d.trust_note_bn && <span className="sig-note">{d.trust_note_bn}</span>}
+      </div>
       {market && !distHasData && (
         <p className="district-fallback-note" role="status">
           {marketLabel(district)}-এর এই পণ্যের WFP জেলা তথ্য নেই — ঢাকার দৈনিক মডেল{activeDistKey ? ` ও ${marketLabel(activeDistKey)}-এর তথ্য` : ''} দেখানো হচ্ছে।
@@ -346,6 +359,7 @@ function Detail({ data, k, desktop, latestAll, onBack, health, district, user, o
           <span><i className="dot" style={{ background: 'var(--c-watch)' }} />একটু বেশি</span>
           <span><i className="dot" style={{ background: 'var(--c-alarm)' }} />অনেক বেশি</span>
           <span><i className="dot" style={{ background: 'var(--c-down)' }} />স্বাভাবিকের চেয়ে কম</span>
+          <span><i className="tri">▲</i>আগাম ঊর্ধ্বমুখী চাপ</span>
           {overlay && <OverlayLegendItem label={overlay.label} />}
         </div>
         <OverlayNote hasMarkets={!!overlay} fellBack={overlay?.fellBack ?? false}
@@ -384,6 +398,12 @@ function Detail({ data, k, desktop, latestAll, onBack, health, district, user, o
               <Cmp label="৯৫% সীমার ভেতরে দাম ছিল" note="লক্ষ্য ৯৫%" a={mm.coverage95 * 100} b={mb.coverage95 * 100} max={100} unit="%" />
               <Cmp label="ভুল সংকেত, প্রতি ১০০ স্বাভাবিক দিনে" note="কম হলে ভালো" a={mm.unusual_per100_normal_days} b={mb.unusual_per100_normal_days} max={35} unit="" />
             </div>
+            {data.resilience && (
+              <div className="resilience-box">
+                <div><b>আগাম চাপ শনাক্তকরণ:</b> {bnNum(data.resilience.early_surge.events_total)} সংকটের মধ্যে <b>{bnNum(data.resilience.early_surge.events_flagged_before_confirm)}টিতে</b> অসঙ্গতি নিশ্চিত হওয়ার আগেই সতর্ক সংকেত (স্বাভাবিক দিনে মাত্র {bnNum(data.resilience.early_surge.mean_normal_emerging_per_100d, 1)}%)</div>
+                <div><b>মিসিং/লেট/ইউনিট সুরক্ষা:</b> {bnNum(data.resilience.reporting_guard.gap_widened_days)} গ্যাপ দিনে অনিশ্চয়তার সীমা প্রসারিত · {bnNum(data.resilience.reporting_guard.quarantined_implicit_unit_rows)}টি সন্দেহজনক ইউনিট-স্কেল তথ্য পৃথক করা হয়েছে</div>
+              </div>
+            )}
           </section>
         )}
       </div>
@@ -421,6 +441,9 @@ function Detail({ data, k, desktop, latestAll, onBack, health, district, user, o
                   {e.model?.lead_days_to_peak != null
                     ? <>প্রথম সংকেত {bnDate(e.model.first_flag!)}, পিকের <b>{bnNum(e.model.lead_days_to_peak)} দিন আগে</b></>
                     : 'মডেল আগে ধরতে পারেনি'}
+                  {e.model?.first_emerging && (e.model.days_before_confirmed ?? 0) > 0 && (
+                    <> · <span className="em-ev">আগাম চাপ {bnDate(e.model.first_emerging)} (নিশ্চিত হওয়ার {bnNum(e.model.days_before_confirmed!)} দিন আগে)</span></>
+                  )}
                   {e.baseline?.lead_days_to_peak != null && <>। সাধারণ পদ্ধতি: {bnNum(e.baseline.lead_days_to_peak)} দিন আগে</>}
                   {data.fair_compare && e.baseline?.lead_days_to_peak != null &&
                     (e.model?.lead_days_to_peak == null || e.baseline.lead_days_to_peak > e.model.lead_days_to_peak) && (() => {

@@ -128,6 +128,10 @@ def paragraph(row: pd.Series, commodity: str, date) -> str:
 
     if st == "Normal":
         s.append("দাম প্রত্যাশিত সীমার ভেতরে আছে।")
+        if row.get("surge_stage", "") == "emerging":
+            sc_pct = bn_num(round(float(row.get("surge_score", 0.6) or 0.6) * 100))
+            why = "দ্রুত দাম লাফানোর গতি" if row.get("surge_reason", "") == "velocity_shock" else "ধারাবাহিক ঊর্ধ্বমুখী চাপ"
+            s.append(f"আগাম ঊর্ধ্বমুখী চাপ (চাপ সূচক {sc_pct}%): অ্যানোমালি নিশ্চিত হওয়ার আগেই {why} দেখা যাচ্ছে, তাই নজরে রাখা ভালো।")
     elif row.get("model_reason", "") == "steady_rise":
         s.append(f"দাম এখনো প্রত্যাশিত সীমার ভেতরে, কিন্তু টানা কয়েক দিন ধরে সীমার উপরের দিকে আছে "
                  f"(প্রত্যাশার চেয়ে {bn_num(u)}% বেশি)। ধীরে ধীরে দাম বাড়ার শুরু হতে পারে, তাই নজরে রাখা ভালো।")
@@ -139,5 +143,8 @@ def paragraph(row: pd.Series, commodity: str, date) -> str:
     else:
         s.append(f"আসল দাম প্রত্যাশার চেয়ে {bn_num(-u)}% কম, অর্থাৎ দাম প্রত্যাশার চেয়ে বেশি পড়েছে। "
                  "ক্রেতার জন্য এটা সতর্কসংকেত নয়।")
+    trust_note = row.get("trust_note_bn", "")
+    if isinstance(trust_note, str) and trust_note.strip():
+        s.append(f"(তথ্য সতর্কতা: {trust_note.strip()}।)")
     s.append("(এটা মডেলের ব্যাখ্যা, কারসাজির প্রমাণ নয়।)")
     return " ".join(s)
