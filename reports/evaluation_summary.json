@@ -9,25 +9,25 @@
   },
   "commodities": {
     "onion_local": {
-      "latest_date": "2026-11-23",
+      "latest_date": "2026-11-24",
       "latest_price": 50.0,
       "latest_status": "Normal",
-      "series_days": 1127,
+      "series_days": 1128,
       "model": {
-        "n_days": 1127,
+        "n_days": 1128,
         "coverage80": 0.79,
         "coverage95": 0.923,
         "median_width80_pct": 36.9,
-        "unusual_per100_normal_days": 6.62
+        "unusual_per100_normal_days": 6.61
       },
       "baseline": {
-        "n_days": 1127,
+        "n_days": 1128,
         "coverage80": 0.52,
         "coverage95": 0.703,
         "median_width80_pct": 33.2,
-        "unusual_per100_normal_days": 29.29
+        "unusual_per100_normal_days": 29.26
       },
-      "false_alarm_reduction_x": 4.42
+      "false_alarm_reduction_x": 4.43
     },
     "onion_import": {
       "latest_date": "2026-02-10",
@@ -51,67 +51,67 @@
       "false_alarm_reduction_x": 3.0
     },
     "egg_farm": {
-      "latest_date": "2026-11-23",
-      "latest_price": 43.5,
+      "latest_date": "2026-11-24",
+      "latest_price": 44.0,
       "latest_status": "Normal",
-      "series_days": 1127,
+      "series_days": 1128,
       "model": {
-        "n_days": 1127,
+        "n_days": 1128,
         "coverage80": 0.832,
         "coverage95": 0.936,
         "median_width80_pct": 14.5,
         "unusual_per100_normal_days": 6.47
       },
       "baseline": {
-        "n_days": 1127,
+        "n_days": 1128,
         "coverage80": 0.525,
-        "coverage95": 0.719,
+        "coverage95": 0.718,
         "median_width80_pct": 11.8,
-        "unusual_per100_normal_days": 25.89
+        "unusual_per100_normal_days": 25.97
       },
-      "false_alarm_reduction_x": 4.0
+      "false_alarm_reduction_x": 4.01
     },
     "potato": {
-      "latest_date": "2026-11-23",
+      "latest_date": "2026-11-24",
       "latest_price": 27.5,
       "latest_status": "Normal",
-      "series_days": 1127,
+      "series_days": 1128,
       "model": {
-        "n_days": 1127,
+        "n_days": 1128,
         "coverage80": 0.795,
-        "coverage95": 0.925,
+        "coverage95": 0.926,
         "median_width80_pct": 34.8,
-        "unusual_per100_normal_days": 8.09
+        "unusual_per100_normal_days": 8.08
       },
       "baseline": {
-        "n_days": 1127,
-        "coverage80": 0.526,
+        "n_days": 1128,
+        "coverage80": 0.527,
         "coverage95": 0.743,
         "median_width80_pct": 23.6,
-        "unusual_per100_normal_days": 23.99
+        "unusual_per100_normal_days": 23.97
       },
       "false_alarm_reduction_x": 2.97
     },
     "green_chili": {
-      "latest_date": "2026-11-23",
+      "latest_date": "2026-11-24",
       "latest_price": 100.0,
       "latest_status": "Normal",
-      "series_days": 1102,
+      "series_days": 1103,
       "model": {
-        "n_days": 1102,
-        "coverage80": 0.79,
-        "coverage95": 0.936,
-        "median_width80_pct": 96.3,
+        "n_days": 1103,
+        "coverage80": 0.791,
+        "coverage95": 0.937,
+        "median_width80_pct": 96.1,
         "unusual_per100_normal_days": 4.91
       },
       "baseline": {
-        "n_days": 1102,
-        "coverage80": 0.662,
-        "coverage95": 0.813,
-        "median_width80_pct": 86.9,
-        "unusual_per100_normal_days": 17.15
+        "n_days": 1103,
+        "coverage80": 0.661,
+        "coverage95": 0.812,
+        "median_width80_pct": 86.5,
+        "unusual_per100_normal_days": 17.23
       },
-      "false_alarm_reduction_x": 3.49
+      "false_alarm_reduction_x": 3.51
     }
   },
   "events": [
@@ -270,7 +270,7 @@
       "target_fa": 10,
       "method": "model",
       "threshold": 0.86,
-      "actual_fa": 9.91,
+      "actual_fa": 9.9,
       "events": 7,
       "detected": 7,
       "median_lead": 16.0,
@@ -310,7 +310,7 @@
       "target_fa": 10,
       "method": "baseline",
       "threshold": 1.96,
-      "actual_fa": 9.82,
+      "actual_fa": 9.81,
       "events": 7,
       "detected": 7,
       "median_lead": 20.0,
