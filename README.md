@@ -3,7 +3,9 @@
 [![CI](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/ci.yml/badge.svg)](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/ci.yml)
 [![Daily TCB Data & Model Refresh](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/daily-update.yml/badge.svg)](https://github.com/M-U-Rony/cou_hackathon/actions/workflows/daily-update.yml)
 
-**An Explainable Food-Price Anomaly Detection & Early Warning System for Bangladesh** — built for **CoU AI Hackathon (TechNova) 2026**.
+**An Explainable Food-Price Anomaly Detection & Early Warning System for Bangladesh** — built for **CoU AI Hackathon 2026 (`CoU_The_Final_Run`)**.
+
+**[Live Dashboard](https://fairprice-bd.vercel.app)** · **[Interactive Crisis Replay](https://fairprice-bd.vercel.app/replay.html)** · **[Overview & Architecture](https://fairprice-bd.vercel.app/landing.html)** · **[Project Idea PDF](project.pdf)**
 
 > **Core Thesis:** FairPrice BD is **not** a point-price forecaster and does **not** claim to prove market syndicates. Using only information available **14 days earlier (`H = 14`)**, it computes a calibrated **80% & 95% Expected Price Band** for today and measures whether a price jump is explained by seasonality, recent momentum, exchange rates, or rainfall—or whether it is an **unexplained anomaly (`unexplained_pct`)**. Because major crises breach normal ranges before peaking, the system raises **early warnings 2 to 7 weeks before the peak**.
 

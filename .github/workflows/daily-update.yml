@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   refresh:
+    if: github.repository == 'M-U-Rony/cou_hackathon' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -59,6 +60,6 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "chore: daily TCB data & model refresh ($(date -u +%Y-%m-%d))"
-            git pull --rebase origin main
+            git pull --rebase origin "${{ github.ref_name }}"
             git push
           fi
