@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:api": "tsc -p tsconfig.api.json",
+    "start": "node server.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",

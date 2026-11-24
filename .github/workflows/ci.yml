@@ -60,3 +60,23 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
+
+  docker-build:
+    name: Docker Production Build & Smoke Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t fairprice-bd:ci .
+
+      - name: Smoke test container endpoints
+        run: |
+          docker run -d --rm --name fp-ci -p 3000:3000 fairprice-bd:ci
+          trap 'docker stop fp-ci >/dev/null 2>&1 || true' EXIT
+          sleep 2
+          curl -fsS http://127.0.0.1:3000/api/health
+          curl -fsS http://127.0.0.1:3000/ >/dev/null
+          curl -fsS http://127.0.0.1:3000/landing.html >/dev/null
+          curl -fsS http://127.0.0.1:3000/login.html >/dev/null

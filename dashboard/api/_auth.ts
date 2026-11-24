@@ -24,7 +24,6 @@ export const VALID_COMMODITIES = new Set([
   'green_chili',
   'potato',
   'onion_local',
-  'onion_import',
 ])
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/

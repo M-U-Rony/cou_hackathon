@@ -17,7 +17,7 @@ import { aiHealth, aiSummary, speak, stopSpeaking } from '../lib/ai'
 import { fetchSession, logoutSession, saveUserPreferences, type AuthUser } from '../lib/auth'
 import './style.css'
 
-const ORDER = ['egg_farm', 'green_chili', 'potato', 'onion_local', 'onion_import']
+const ORDER = ['egg_farm', 'green_chili', 'potato', 'onion_local']
 const RANGES = { '3m': ['৩ মাস', 92], '1y': ['১ বছর', 366], all: ['সব', 99999] } as const
 type RangeKey = keyof typeof RANGES
 const toHash = (k: string) => k.replace(/_/g, '-')

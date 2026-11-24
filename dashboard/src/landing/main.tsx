@@ -4,7 +4,7 @@ import { fetchSession, type AuthUser } from '../lib/auth'
 import { TONE_BN, bnDate, bnPrice, loadData, tone, type FPData } from '../lib/data'
 import './style.css'
 
-const ORDER = ['egg_farm', 'green_chili', 'potato', 'onion_local', 'onion_import']
+const ORDER = ['egg_farm', 'green_chili', 'potato', 'onion_local']
 
 function LandingPage() {
   const [data, setData] = useState<FPData | null>(null)

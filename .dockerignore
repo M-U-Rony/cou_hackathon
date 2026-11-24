@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+node_modules
+dashboard/node_modules
+dashboard/dist
+dashboard/dist-api
+__pycache__
+.pytest_cache
+*.local
+.env
+.env.*
+!dashboard/.env.example
+reports/model*
+reports/dashboard

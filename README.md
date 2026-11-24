@@ -166,7 +166,17 @@ npm install
 npm test                          # Vitest + Testing Library
 npx tsc -p tsconfig.app.json --noEmit
 npm run build                     # Production bundle (index.html, landing.html, login.html, replay.html)
+npm run build:api                 # Compile serverless APIs to dist-api/ for self-hosted Docker
 npm run dev                       # Local dev server (http://localhost:5173)
+```
+
+### 3. Run with Docker
+```bash
+# Build & run web dashboard + Node API server on http://localhost:3000
+docker compose up --build web
+
+# Optional: run walk-forward LightGBM + CQR ML training inside container
+docker compose --profile pipeline run --rm pipeline
 ```
 
 ---
