@@ -9,25 +9,25 @@
   },
   "commodities": {
     "onion_local": {
-      "latest_date": "2026-11-24",
+      "latest_date": "2026-11-25",
       "latest_price": 50.0,
       "latest_status": "Normal",
-      "series_days": 1128,
+      "series_days": 1129,
       "model": {
-        "n_days": 1128,
+        "n_days": 1129,
         "coverage80": 0.79,
         "coverage95": 0.923,
-        "median_width80_pct": 36.9,
+        "median_width80_pct": 37.0,
         "unusual_per100_normal_days": 6.61
       },
       "baseline": {
-        "n_days": 1128,
-        "coverage80": 0.52,
+        "n_days": 1129,
+        "coverage80": 0.521,
         "coverage95": 0.703,
-        "median_width80_pct": 33.2,
-        "unusual_per100_normal_days": 29.26
+        "median_width80_pct": 33.1,
+        "unusual_per100_normal_days": 29.23
       },
-      "false_alarm_reduction_x": 4.43
+      "false_alarm_reduction_x": 4.42
     },
     "onion_import": {
       "latest_date": "2026-02-10",
@@ -51,67 +51,67 @@
       "false_alarm_reduction_x": 3.0
     },
     "egg_farm": {
-      "latest_date": "2026-11-24",
-      "latest_price": 44.0,
+      "latest_date": "2026-11-25",
+      "latest_price": 43.5,
       "latest_status": "Normal",
-      "series_days": 1128,
+      "series_days": 1129,
       "model": {
-        "n_days": 1128,
-        "coverage80": 0.832,
+        "n_days": 1129,
+        "coverage80": 0.833,
         "coverage95": 0.936,
         "median_width80_pct": 14.5,
-        "unusual_per100_normal_days": 6.47
+        "unusual_per100_normal_days": 6.46
       },
       "baseline": {
-        "n_days": 1128,
-        "coverage80": 0.525,
-        "coverage95": 0.718,
+        "n_days": 1129,
+        "coverage80": 0.524,
+        "coverage95": 0.717,
         "median_width80_pct": 11.8,
-        "unusual_per100_normal_days": 25.97
+        "unusual_per100_normal_days": 26.05
       },
-      "false_alarm_reduction_x": 4.01
+      "false_alarm_reduction_x": 4.03
     },
     "potato": {
-      "latest_date": "2026-11-24",
+      "latest_date": "2026-11-25",
       "latest_price": 27.5,
       "latest_status": "Normal",
-      "series_days": 1128,
+      "series_days": 1129,
       "model": {
-        "n_days": 1128,
+        "n_days": 1129,
         "coverage80": 0.795,
         "coverage95": 0.926,
         "median_width80_pct": 34.8,
         "unusual_per100_normal_days": 8.08
       },
       "baseline": {
-        "n_days": 1128,
+        "n_days": 1129,
         "coverage80": 0.527,
         "coverage95": 0.743,
         "median_width80_pct": 23.6,
-        "unusual_per100_normal_days": 23.97
+        "unusual_per100_normal_days": 23.94
       },
-      "false_alarm_reduction_x": 2.97
+      "false_alarm_reduction_x": 2.96
     },
     "green_chili": {
-      "latest_date": "2026-11-24",
+      "latest_date": "2026-11-25",
       "latest_price": 100.0,
       "latest_status": "Normal",
-      "series_days": 1103,
+      "series_days": 1104,
       "model": {
-        "n_days": 1103,
+        "n_days": 1104,
         "coverage80": 0.791,
         "coverage95": 0.937,
-        "median_width80_pct": 96.1,
-        "unusual_per100_normal_days": 4.91
+        "median_width80_pct": 95.9,
+        "unusual_per100_normal_days": 4.9
       },
       "baseline": {
-        "n_days": 1103,
-        "coverage80": 0.661,
+        "n_days": 1104,
+        "coverage80": 0.66,
         "coverage95": 0.812,
         "median_width80_pct": 86.5,
-        "unusual_per100_normal_days": 17.23
+        "unusual_per100_normal_days": 17.31
       },
-      "false_alarm_reduction_x": 3.51
+      "false_alarm_reduction_x": 3.53
     }
   },
   "events": [
@@ -240,7 +240,7 @@
       "target_fa": 1,
       "method": "model",
       "threshold": 2.7,
-      "actual_fa": 0.99,
+      "actual_fa": 0.98,
       "events": 7,
       "detected": 3,
       "median_lead": 5.0,
@@ -260,7 +260,7 @@
       "target_fa": 5,
       "method": "model",
       "threshold": 1.36,
-      "actual_fa": 4.95,
+      "actual_fa": 4.94,
       "events": 7,
       "detected": 6,
       "median_lead": 13.0,
@@ -270,7 +270,7 @@
       "target_fa": 10,
       "method": "model",
       "threshold": 0.86,
-      "actual_fa": 9.9,
+      "actual_fa": 9.89,
       "events": 7,
       "detected": 7,
       "median_lead": 16.0,
@@ -280,7 +280,7 @@
       "target_fa": 1,
       "method": "baseline",
       "threshold": 6.4,
-      "actual_fa": 0.99,
+      "actual_fa": 0.98,
       "events": 7,
       "detected": 3,
       "median_lead": 5.0,
@@ -309,8 +309,8 @@
     {
       "target_fa": 10,
       "method": "baseline",
-      "threshold": 1.96,
-      "actual_fa": 9.81,
+      "threshold": 1.94,
+      "actual_fa": 10.0,
       "events": 7,
       "detected": 7,
       "median_lead": 20.0,
@@ -323,7 +323,7 @@
       "events_flagged_before_confirm": 6,
       "median_extra_lead_days": 3.0,
       "max_extra_lead_days": 40,
-      "mean_normal_emerging_per_100d": 2.46
+      "mean_normal_emerging_per_100d": 2.45
     },
     "reporting_guard": {
       "gap_widened_days": 190,
