@@ -2153,6 +2153,7 @@ date,location,precip_mm
 2026-11-22,bogura,1.0
 2026-11-23,bogura,1.4
 2026-11-24,bogura,0.0
+2026-11-25,bogura,0.0
 2021-01-01,dhaka,0.0
 2021-01-02,dhaka,0.0
 2021-01-03,dhaka,0.0
@@ -4307,6 +4308,7 @@ date,location,precip_mm
 2026-11-22,dhaka,0.9
 2026-11-23,dhaka,1.2
 2026-11-24,dhaka,0.0
+2026-11-25,dhaka,0.0
 2021-01-01,faridpur,0.0
 2021-01-02,faridpur,0.0
 2021-01-03,faridpur,0.0
@@ -6461,6 +6463,7 @@ date,location,precip_mm
 2026-11-22,faridpur,0.5
 2026-11-23,faridpur,1.6
 2026-11-24,faridpur,0.0
+2026-11-25,faridpur,0.0
 2021-01-01,jessore,0.0
 2021-01-02,jessore,0.0
 2021-01-03,jessore,0.0
@@ -8615,6 +8618,7 @@ date,location,precip_mm
 2026-11-22,jessore,1.1
 2026-11-23,jessore,1.6
 2026-11-24,jessore,0.0
+2026-11-25,jessore,0.0
 2021-01-01,pabna,0.0
 2021-01-02,pabna,0.0
 2021-01-03,pabna,0.0
@@ -10769,6 +10773,7 @@ date,location,precip_mm
 2026-11-22,pabna,0.6
 2026-11-23,pabna,2.3
 2026-11-24,pabna,0.0
+2026-11-25,pabna,0.0
 2021-01-01,rajshahi,0.0
 2021-01-02,rajshahi,0.0
 2021-01-03,rajshahi,0.0
@@ -12923,3 +12928,4 @@ date,location,precip_mm
 2026-11-22,rajshahi,1.9
 2026-11-23,rajshahi,6.9
 2026-11-24,rajshahi,0.0
+2026-11-25,rajshahi,0.0
