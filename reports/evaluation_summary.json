@@ -1,6 +1,6 @@
 {
   "project": "FairPrice BD",
-  "generated": "2026-11-26",
+  "generated": "2026-11-27",
   "horizon_days": 14,
   "validation": {
     "scheme": "walk-forward monthly expanding window (zero future leakage)",
